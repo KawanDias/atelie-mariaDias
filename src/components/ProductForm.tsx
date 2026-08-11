@@ -12,6 +12,7 @@ function ProductForm() {
             <select>
                 <option>Enxoval de Bebê</option>
                 <option>Batizado</option>
+                <option>Toalhas Personalizadas</option>
                 <option>Acessórios & Maternidade</option>
                 <option>Decoração do Quartinho</option>
             </select>

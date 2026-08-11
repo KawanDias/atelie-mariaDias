@@ -14,10 +14,9 @@ function LoginPage() {
         email: '',
         password: '',
         confirmPassword: '',
-        role: 'client' as 'client' | 'admin',
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData((prev) => ({
             ...prev,
             [e.target.name]: e.target.value,
@@ -37,7 +36,7 @@ function LoginPage() {
                 if (!formData.name || formData.name.length < 3) {
                     throw new Error('Nome deve ter pelo menos 3 caracteres');
                 }
-                await signup(formData.name, formData.email, formData.password, formData.role);
+                await signup(formData.name, formData.email, formData.password);
             } else {
                 await login(formData.email, formData.password);
             }
@@ -101,15 +100,6 @@ function LoginPage() {
                                 placeholder="••••••••"
                                 required
                             />
-
-                            <label>Tipo de conta</label>
-                            <select name="role" value={formData.role} onChange={handleChange}>
-                                <option value="client">Cliente (Comprador)</option>
-                                <option value="admin">Administrador (Desenvolvedora)</option>
-                            </select>
-                            <p style={{ fontSize: '0.85rem', color: '#a89a97', marginTop: '0.5rem' }}>
-                                Selecione "Administrador" se você é a Maria Dias ou precisa de acesso ao painel de controle.
-                            </p>
                         </>
                     )}
 

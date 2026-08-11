@@ -6,6 +6,6 @@ export interface Product {
     description: string;
     category: ProductCategory;
     price: string;
-    image: string;
+    images: string[]; // <-- Aceita até 4 fotos por produto
     featured?: boolean;
 }

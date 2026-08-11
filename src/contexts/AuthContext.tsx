@@ -12,9 +12,13 @@ interface AuthContextType {
     user: User | null;
     isLoading: boolean;
     login: (email: string, password: string) => Promise<void>;
-    signup: (name: string, email: string, password: string, role: 'client' | 'admin') => Promise<void>;
+    signup: (name: string, email: string, password: string) => Promise<void>;
     logout: () => void;
 }
+
+// Credenciais fixas da Administração
+const ADMIN_EMAIL = 'mariagbdias@gmail.com';
+const ADMIN_PASSWORD = 'Tn0adgll'; // Altere para a senha que desejar
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -22,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load user from localStorage on mount
+    // Carrega o usuário do localStorage ao iniciar
     useEffect(() => {
         const savedUser = localStorage.getItem('atelie_user');
         if (savedUser) {
@@ -46,8 +50,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const login = async (email: string, password: string) => {
+        // 1. Autenticação direta do Administrador via credenciais fixas
+        if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+            if (password !== ADMIN_PASSWORD) {
+                throw new Error('Email ou senha inválidos');
+            }
+
+            const adminUser: User = {
+                id: 'admin-master',
+                email: ADMIN_EMAIL,
+                name: 'Administradora',
+                role: 'admin',
+            };
+
+            setUser(adminUser);
+            localStorage.setItem('atelie_user', JSON.stringify(adminUser));
+            return;
+        }
+
+        // 2. Autenticação de clientes comuns no localStorage
         const users = getUsers();
-        const foundUser = users.find((u) => u.email === email);
+        const foundUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
 
         if (!foundUser || foundUser.password !== password) {
             throw new Error('Email ou senha inválidos');
@@ -57,27 +80,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: foundUser.id,
             email: foundUser.email,
             name: foundUser.name,
-            role: foundUser.role,
+            role: 'client',
         };
 
         setUser(userToSet);
         localStorage.setItem('atelie_user', JSON.stringify(userToSet));
     };
 
-    const signup = async (name: string, email: string, password: string, role: 'client' | 'admin' = 'client') => {
+    const signup = async (name: string, email: string, password: string) => {
+        // Bloqueia tentativas de cadastrar a conta de administrador via formulário público
+        if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+            throw new Error('Este e-mail é reservado para a administração.');
+        }
+
         const users = getUsers();
 
-        // Check if email already exists
-        if (users.some((u) => u.email === email)) {
+        // Verifica se o e-mail já existe
+        if (users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
             throw new Error('Este email já está cadastrado');
         }
 
+        // Todo novo cadastro público é criado estritamente como 'client'
         const newUser: User = {
             id: Date.now().toString(),
             email,
             name,
             password,
-            role,
+            role: 'client',
         };
 
         users.push(newUser);

@@ -1,94 +1,203 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { getProducts } from '../services/productService';
 import { useFavorites } from '../contexts/FavoritesContext';
-import { openWhatsApp } from '../services/whatsappService';
-import type { Product } from '../types';
 
-function ProductPage() {
+export function ProductPage() {
     const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const [product, setProduct] = useState<Product | null>(null);
+    const products = getProducts();
     const { isFavorite, toggleFavorite } = useFavorites();
 
-    useEffect(() => {
-        const products = getProducts();
-        const found = products.find((p) => p.id.toString() === id);
-        if (found) {
-            setProduct(found);
-        } else {
-            navigate('/catalogo');
-        }
-    }, [id, navigate]);
+    const product = products.find((p) => p.id === Number(id));
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     if (!product) {
         return (
-            <section className="container">
-                <div className="panel" style={{ textAlign: 'center', padding: '2rem' }}>
-                    <p>Carregando...</p>
-                </div>
-            </section>
+            <div style={{ padding: '4rem 1rem', textAlign: 'center' }}>
+                <h2>Produto não encontrado!</h2>
+                <Link to="/catalogo" style={{ color: 'var(--primary)', marginTop: '1rem', display: 'inline-block' }}>
+                    Voltar ao Catálogo
+                </Link>
+            </div>
         );
     }
 
-    const isLiked = isFavorite(product.id.toString());
+    const productIdStr = product.id.toString();
+    const fav = isFavorite(productIdStr);
+
+    // Compatibilidade com array de imagens ou imagem única antiga
+    const images: string[] = (product as any).images 
+        ? (product as any).images 
+        : ((product as any).image ? [(product as any).image] : []);
+
+    const nextImage = () => {
+        if (images.length === 0) return;
+        setCurrentImageIndex((prev) => (prev + 1) % images.length);
+    };
+
+    const prevImage = () => {
+        if (images.length === 0) return;
+        setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+    };
+
+    const mainImg = images[currentImageIndex] || '';
+    const isUrl = mainImg.startsWith('http') || mainImg.startsWith('data:');
 
     return (
-        <section className="container">
-            <div className="about">
-                <div className="panel" style={{ position: 'relative' }}>
-                    <div className="product-image" style={{ height: '320px' }}>{product.image}</div>
-                    <button
-                        onClick={() => toggleFavorite(product.id.toString())}
-                        style={{
-                            position: 'absolute',
-                            top: '1rem',
-                            right: '1rem',
-                            background: 'rgba(255, 255, 255, 0.9)',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '2.5rem',
-                            height: '2.5rem',
-                            fontSize: '1.5rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'transform 0.2s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.1)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-                    >
-                        {isLiked ? '❤️' : '🤍'}
-                    </button>
+        <div style={{ padding: '2rem 1rem', maxWidth: '1000px', margin: '0 auto' }}>
+            <Link to="/catalogo" style={{ textDecoration: 'none', color: '#888', fontSize: '0.9rem', display: 'inline-block', marginBottom: '1.5rem' }}>
+                ← Voltar para o Catálogo
+            </Link>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
+                
+                {/* CARROSSEL DE FOTOS */}
+                <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative', width: '100%', height: '380px', borderRadius: '16px', overflow: 'hidden', background: '#f8f8f8', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isUrl ? (
+                            <img 
+                                src={mainImg} 
+                                alt={product.title} 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            />
+                        ) : (
+                            <span style={{ fontSize: '4rem' }}>{mainImg || '🖼️'}</span>
+                        )}
+
+                        {/* Botões do Carrossel (só se houver mais de 1 foto) */}
+                        {images.length > 1 && (
+                            <>
+                                <button 
+                                    onClick={prevImage}
+                                    style={{
+                                        position: 'absolute',
+                                        left: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'rgba(255, 255, 255, 0.85)',
+                                        border: 'none',
+                                        borderRadius: '50%',
+                                        width: '36px',
+                                        height: '36px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                                    }}
+                                >
+                                    ❮
+                                </button>
+                                <button 
+                                    onClick={nextImage}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'rgba(255, 255, 255, 0.85)',
+                                        border: 'none',
+                                        borderRadius: '50%',
+                                        width: '36px',
+                                        height: '36px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                                    }}
+                                >
+                                    ❯
+                                </button>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Miniaturas na parte inferior */}
+                    {images.length > 1 && (
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem', justifyContent: 'center' }}>
+                            {images.map((img: string, idx: number) => {
+                                const thumbIsUrl = img.startsWith('http') || img.startsWith('data:');
+                                return (
+                                    <div
+                                        key={idx}
+                                        onClick={() => setCurrentImageIndex(idx)}
+                                        style={{
+                                            width: '65px',
+                                            height: '65px',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            overflow: 'hidden',
+                                            border: currentImageIndex === idx ? '2px solid var(--primary)' : '2px solid transparent',
+                                            opacity: currentImageIndex === idx ? 1 : 0.6,
+                                            transition: 'all 0.2s',
+                                            background: '#f5f5f5',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                    >
+                                        {thumbIsUrl ? (
+                                            <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <span style={{ fontSize: '1.2rem' }}>{img}</span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
-                <div className="panel">
-                    <p style={{ color: 'var(--primary)', fontWeight: 700 }}>📦 {product.category}</p>
-                    <h2>{product.title}</h2>
-                    <p style={{ fontSize: '1.05rem', color: '#7d6f6c', lineHeight: 1.6 }}>{product.description}</p>
-                    <p className="price" style={{ fontSize: '1.4rem', marginTop: '1rem' }}>{product.price}</p>
-                    <p style={{ color: '#a89a97', fontSize: '0.95rem', marginTop: '1rem' }}>
-                        ✨ Prazo de confecção artesanal: 7 a 10 dias úteis
-                    </p>
-                    <div style={{ display: 'flex', gap: '0.8rem', marginTop: '1.5rem' }}>
-                        <button
-                            className="btn secondary"
-                            onClick={() => window.history.back()}
-                            style={{ flex: 1 }}
+
+                {/* Detalhes do Produto */}
+                <div>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, textTransform: 'uppercase' }}>
+                        {product.category}
+                    </span>
+                    <h1 style={{ fontSize: '1.8rem', color: '#4a3b32', margin: '0.5rem 0' }}>{product.title}</h1>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '1.5rem' }}>{product.price}</p>
+
+                    <div style={{ background: '#fff', padding: '1.2rem', borderRadius: '12px', border: '1px solid #eee', marginBottom: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: '#4a3b32' }}>Descrição do Produto</h3>
+                        <p style={{ color: '#666', lineHeight: '1.6', fontSize: '0.95rem' }}>{product.description}</p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <a 
+                            href={`https://wa.me/5500000000000?text=Olá!%20Gostaria%20de%20encomendar%20o%20produto:%20${encodeURIComponent(product.title)}`}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{
+                                flex: 1,
+                                background: 'var(--primary)',
+                                color: 'white',
+                                textAlign: 'center',
+                                padding: '0.8rem',
+                                borderRadius: '8px',
+                                textDecoration: 'none',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem'
+                            }}
                         >
-                            Voltar
-                        </button>
+                            💬 Encomendar pelo WhatsApp
+                        </a>
+
                         <button
-                            className="btn"
-                            onClick={() => openWhatsApp(product)}
-                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                            onClick={() => toggleFavorite(productIdStr)}
+                            style={{
+                                background: fav ? '#ffebeb' : '#f5f5f5',
+                                border: '1px solid #ddd',
+                                padding: '0.8rem',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '1.2rem'
+                            }}
                         >
-                            📱 Solicitar Orçamento
+                            {fav ? '❤️' : '🤍'}
                         </button>
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
     );
 }
 
