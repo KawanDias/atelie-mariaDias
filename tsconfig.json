@@ -14,7 +14,7 @@
         "strict": true,
         "forceConsistentCasingInFileNames": true,
         "module": "ESNext",
-       "moduleResolution": "bundler",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
@@ -23,6 +23,7 @@
     "include": [
         "src"
     ],
+    "files": [],
     "references": [
         {
             "path": "./tsconfig.node.json"
