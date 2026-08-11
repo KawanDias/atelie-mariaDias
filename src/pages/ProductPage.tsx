@@ -1,15 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getProducts } from '../services/productService';
 import { useFavorites } from '../contexts/FavoritesContext';
+import type { Product } from '../types';
 
 export function ProductPage() {
     const { id } = useParams<{ id: string }>();
-    const products = getProducts();
+    const [product, setProduct] = useState<Product | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const { isFavorite, toggleFavorite } = useFavorites();
 
-    const product = products.find((p) => p.id === Number(id));
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    useEffect(() => {
+        async function fetchProduct() {
+            try {
+                const products = await getProducts();
+                const found = products.find((p) => p.id === Number(id));
+                setProduct(found || null);
+            } catch (error) {
+                console.error("Erro ao carregar produto:", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchProduct();
+    }, [id]);
+
+    if (loading) {
+        return <div style={{ padding: '4rem 1rem', textAlign: 'center', color: '#b58b8b' }}>Carregando produto...</div>;
+    }
 
     if (!product) {
         return (

@@ -1,8 +1,9 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import toast from 'react-hot-toast';
 
 interface FavoritesContextType {
     favorites: string[];
-    toggleFavorite: (productId: string) => void;
+    toggleFavorite: (productId: string, productTitle?: string) => void;
     isFavorite: (productId: string) => boolean;
 }
 
@@ -18,12 +19,23 @@ export const FavoritesProvider: React.FC<{ children: ReactNode }> = ({ children 
         }
     }, []);
 
-    const toggleFavorite = (productId: string) => {
+    const toggleFavorite = (productId: string, productTitle?: string) => {
         setFavorites((prev) => {
-            const updated = prev.includes(productId)
+            const exists = prev.includes(productId);
+            const updated = exists
                 ? prev.filter((id) => id !== productId)
                 : [...prev, productId];
+
             localStorage.setItem('atelie_favorites', JSON.stringify(updated));
+
+            // Dispara o toast dependendo se foi adicionado ou removido
+            const name = productTitle ? `"${productTitle}"` : 'O produto';
+            if (exists) {
+                toast.success(`${name} foi removido dos favoritos.`);
+            } else {
+                toast.success(`${name} foi adicionado aos favoritos!`);
+            }
+
             return updated;
         });
     };

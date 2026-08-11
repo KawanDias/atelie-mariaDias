@@ -1,9 +1,20 @@
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
-import { mockProducts } from '../data/products';
+import { getProducts } from '../services/productService';
+import type { Product } from '../types'; // Importando o tipo Product
 
 function HomePage() {
-    const featuredProducts = mockProducts.filter((product) => product.featured);
+    const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+
+    useEffect(() => {
+        async function loadData() {
+            const allProducts = await getProducts();
+            const filtered = allProducts.filter((product) => product.featured);
+            setFeaturedProducts(filtered);
+        }
+        loadData();
+    }, []);
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem 4rem 1.5rem' }}>
@@ -15,7 +26,6 @@ function HomePage() {
                 alignItems: 'center',
                 marginBottom: '3.5rem'
             }}>
-                {/* Bloco esquerdo: Chamada Principal */}
                 <div style={{ 
                     background: 'linear-gradient(135deg, #fff9f9 0%, #fef2f2 100%)', 
                     padding: '2.5rem', 
@@ -89,7 +99,6 @@ function HomePage() {
                     </div>
                 </div>
 
-                {/* Bloco direito: Por que escolher o Ateliê */}
                 <div style={{ 
                     background: '#ffffff', 
                     padding: '2.2rem', 
@@ -132,24 +141,27 @@ function HomePage() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '3.5rem' }}>
-                {featuredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                ))}
+                {featuredProducts.length > 0 ? (
+                    featuredProducts.map((product) => (
+                        <ProductCard key={product.id} product={product} />
+                    ))
+                ) : (
+                    <p style={{ color: '#a38f8f' }}>Nenhum destaque no momento.</p>
+                )}
             </div>
 
-            {/* Seção Quem Somos / Especialidade */}
+            {/* Seção Quem Somos */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                 <div style={{ background: '#ffffff', padding: '2rem', borderRadius: '20px', border: '1px solid #f2e6e6', boxShadow: '0 4px 16px rgba(230, 200, 200, 0.08)' }}>
                     <h2 style={{ fontSize: '1.2rem', color: '#5e4e4e', fontWeight: 500, marginBottom: '0.8rem' }}>Quem somos</h2>
                     <p style={{ color: '#8c7373', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                        O Ateliê Maria Dias dedica-se a criar enxovais de bebê únicos e especiais. Cada ponto é bordado à mão por quem entende que a chegada de um filho merece o melhor — peças de qualidade, beleza e durabilidade que virão a ser herança de memórias.
+                        O Ateliê Maria Dias dedica-se a criar enxovais de bebê únicos e especiais. Cada ponto é bordado à mão por quem entende que a chegada de um filho merece o melhor.
                     </p>
                 </div>
-
                 <div style={{ background: '#ffffff', padding: '2rem', borderRadius: '20px', border: '1px solid #f2e6e6', boxShadow: '0 4px 16px rgba(230, 200, 200, 0.08)' }}>
                     <h3 style={{ fontSize: '1.2rem', color: '#5e4e4e', fontWeight: 500, marginBottom: '0.8rem' }}>Nossa especialidade</h3>
                     <p style={{ color: '#8c7373', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                        Enxoval sob encomenda com personalização. Desde lençóis e mantas bordados até bastidores porta-maternidade e acessórios, cada item é pensado para trazer acolhimento e carinho ao primeiro espaço do seu bebê.
+                        Enxoval sob encomenda com personalização. Desde lençóis e mantas bordados até bastidores porta-maternidade e acessórios.
                     </p>
                 </div>
             </div>

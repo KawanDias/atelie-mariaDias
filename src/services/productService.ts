@@ -1,58 +1,62 @@
-import type { Product } from '../types';
+import localforage from 'localforage';
+import { Product } from '../types';
 
-const STORAGE_KEY = 'atelie_products';
+const PRODUCTS_KEY = 'atelie_products';
 
-export function getProducts(): Product[] {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            return JSON.parse(stored);
-        }
-    } catch (error) {
-        console.error('Erro ao ler do localStorage:', error);
-    }
+localforage.config({
+  name: 'AtelieMariaDias',
+  storeName: 'products_store'
+});
+
+// Funções individuais exportadas para compatibilidade com o resto do site
+export async function getProducts(): Promise<Product[]> {
+  try {
+    const products = await localforage.getItem<Product[]>(PRODUCTS_KEY);
+    return products || [];
+  } catch (error) {
+    console.error('Erro ao buscar produtos:', error);
     return [];
+  }
 }
 
-export function addProduct(product: Omit<Product, 'id'>): Product {
-    const products = getProducts();
-    const newProduct: Product = {
-        ...product,
-        id: products.length > 0 ? Math.max(...products.map((p) => Number(p.id) || 0)) + 1 : 1,
-    };
-    products.push(newProduct);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    
-    // Dispara um evento para atualizar o catálogo/home instantaneamente
-    window.dispatchEvent(new Event('storage_updated'));
-    return newProduct;
+export async function saveProducts(products: Product[]): Promise<void> {
+  await localforage.setItem(PRODUCTS_KEY, products);
 }
 
-export function updateProduct(id: number, updates: Partial<Product>): Product | null {
-    const products = getProducts();
-    const index = products.findIndex((p) => p.id === id);
-    if (index === -1) return null;
-    const updated = { ...products[index], ...updates };
-    products[index] = updated;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    
-    window.dispatchEvent(new Event('storage_updated'));
-    return updated;
+export async function addProduct(newProduct: Product): Promise<Product[]> {
+  const products = await getProducts();
+  const updatedProducts = [newProduct, ...products];
+  await saveProducts(updatedProducts);
+  return updatedProducts;
 }
 
-export function deleteProduct(id: number): boolean {
-    const products = getProducts();
-    const filtered = products.filter((p) => p.id !== id);
-    if (filtered.length === products.length) return false;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-    
-    window.dispatchEvent(new Event('storage_updated'));
-    return true;
+export async function updateProduct(id: number, updatedData: Partial<Product>): Promise<Product[]> {
+  const products = await getProducts();
+  const updatedProducts = products.map((p) => (p.id === id ? { ...p, ...updatedData } : p));
+  await saveProducts(updatedProducts);
+  return updatedProducts;
 }
 
-export function initializeDefaultProducts(defaultProducts: Product[]) {
-    const existing = getProducts();
-    if (existing.length === 0) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultProducts));
-    }
+export async function deleteProduct(id: number): Promise<Product[]> {
+  const products = await getProducts();
+  const updatedProducts = products.filter((p) => p.id !== id);
+  await saveProducts(updatedProducts);
+  return updatedProducts;
 }
+
+export async function initializeDefaultProducts(defaultProducts: Product[]): Promise<void> {
+  const current = await getProducts();
+  if (current.length === 0) {
+    await saveProducts(defaultProducts);
+  }
+}
+
+// Objeto agrupado caso algum arquivo use productService
+export const productService = {
+  getProducts,
+  saveProducts,
+  addProduct,
+  updateProduct,
+  deleteProduct,
+  initializeDefaultProducts,
+};

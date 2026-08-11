@@ -1,17 +1,13 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import type { Product, ProductCategory } from '../types';
-import { getProducts, initializeDefaultProducts, addProduct, updateProduct, deleteProduct } from '../services/productService';
+import { productService } from '../services/productService';
 import { mockProducts } from '../data/products';
 
 function AdminPage() {
-    useMemo(() => {
-        initializeDefaultProducts(mockProducts);
-    }, []);
-
-    const [products, setProducts] = useState<Product[]>(getProducts());
+    const [products, setProducts] = useState<Product[]>([]);
     const [isEditing, setIsEditing] = useState<number | null>(null);
-    
-    // Modificado para guardar um objeto contendo o ID e o Título do produto que será excluído
     const [itemToDelete, setItemToDelete] = useState<{ id: number; title: string } | null>(null);
 
     const [formData, setFormData] = useState({
@@ -23,15 +19,29 @@ function AdminPage() {
         featured: false,
     });
 
-    const refreshProducts = () => {
-        setProducts(getProducts());
+    // Carrega os produtos do IndexedDB ao abrir a página
+    useEffect(() => {
+        async function loadData() {
+            let data = await productService.getProducts();
+            if (data.length === 0 && mockProducts.length > 0) {
+                await productService.saveProducts(mockProducts);
+                data = mockProducts;
+            }
+            setProducts(data);
+        }
+        loadData();
+    }, []);
+
+    const refreshProducts = async () => {
+        const data = await productService.getProducts();
+        setProducts(data);
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
 
         if (formData.images.length + files.length > 4) {
-            alert('Você só pode adicionar no máximo 4 fotos por produto.');
+            toast.error('Você só pode adicionar no máximo 4 fotos por produto.');
             return;
         }
 
@@ -45,6 +55,8 @@ function AdminPage() {
             };
             reader.readAsDataURL(file);
         });
+
+        e.target.value = '';
     };
 
     const removeImage = (indexToRemove: number) => {
@@ -82,34 +94,47 @@ function AdminPage() {
         });
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (itemToDelete !== null) {
-            deleteProduct(itemToDelete.id);
-            refreshProducts();
+            const updated = products.filter((p) => p.id !== itemToDelete.id);
+            await productService.saveProducts(updated);
+            await refreshProducts();
             setItemToDelete(null);
+            toast.success('Produto removido com sucesso!');
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (formData.images.length === 0) {
-            alert('Por favor, adicione pelo menos 1 foto para o produto.');
+            toast.error('Por favor, adicione pelo menos 1 foto para o produto.');
             return;
         }
 
-        const productPayload = {
-            ...formData,
+        const newId = isEditing ? isEditing : (products.length > 0 ? Math.max(...products.map((p) => Number(p.id) || 0)) + 1 : 1);
+
+        const productPayload: Product = {
+            id: newId,
+            title: formData.title,
+            description: formData.description,
+            category: formData.category,
+            price: formData.price,
             image: formData.images[0],
+            images: formData.images,
+            featured: formData.featured,
         };
 
         if (isEditing) {
-            updateProduct(isEditing, productPayload);
+            const updated = products.map((p) => (p.id === isEditing ? productPayload : p));
+            await productService.saveProducts(updated);
+            toast.success('Produto atualizado com sucesso!');
         } else {
-            addProduct(productPayload);
+            await productService.addProduct(productPayload);
+            toast.success('Produto cadastrado com sucesso!');
         }
 
-        refreshProducts();
+        await refreshProducts();
         handleCancel();
     };
 
@@ -201,7 +226,6 @@ function AdminPage() {
                             accept="image/*" 
                             multiple 
                             onChange={handleImageUpload} 
-                            disabled={formData.images.length >= 4}
                             style={{ marginBottom: '0.8rem', fontSize: '0.9rem' }}
                         />
 
@@ -266,11 +290,20 @@ function AdminPage() {
                             type="checkbox" 
                             id="featured" 
                             checked={formData.featured} 
-                            onChange={(e) => setFormData({ ...formData, featured: e.target.checked })} 
+                            onChange={(e) => {
+                                if (e.target.checked) {
+                                    const currentFeaturedCount = products.filter(p => p.featured && p.id !== isEditing).length;
+                                    if (currentFeaturedCount >= 4) {
+                                        toast.error('Já excedeu o limite de 4 destaques da página inicial.');
+                                        return;
+                                    }
+                                }
+                                setFormData({ ...formData, featured: e.target.checked });
+                            }} 
                             style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#b58b8b' }}
                         />
                         <label htmlFor="featured" style={{ fontSize: '0.9rem', cursor: 'pointer', color: '#7a6666', userSelect: 'none' }}>
-                            Destaque na página inicial
+                            Destaque na página inicial (Máx. 4)
                         </label>
                     </div>
 
@@ -325,7 +358,10 @@ function AdminPage() {
                             border: '1px solid #f2e6e6',
                             boxShadow: '0 2px 8px rgba(230, 200, 200, 0.08)'
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <Link 
+                                to={`/produto/${product.id}`} 
+                                style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none', color: 'inherit', flex: 1 }}
+                            >
                                 {isUrl ? (
                                     <img 
                                         src={mainImage} 
@@ -338,10 +374,12 @@ function AdminPage() {
                                     </div>
                                 )}
                                 <div>
-                                    <strong style={{ display: 'block', color: '#5e4e4e', fontSize: '0.95rem' }}>{product.title}</strong>
+                                    <strong style={{ display: 'block', color: '#5e4e4e', fontSize: '0.95rem' }}>
+                                        {product.title} {product.featured && '⭐'}
+                                    </strong>
                                     <span style={{ fontSize: '0.8rem', color: '#a38f8f' }}>{product.category} • {product.price}</span>
                                 </div>
-                            </div>
+                            </Link>
 
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                                 <button 

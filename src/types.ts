@@ -6,6 +6,7 @@ export interface Product {
     description: string;
     category: ProductCategory;
     price: string;
-    images: string[]; // <-- Aceita até 4 fotos por produto
+    images: string[]; 
+    image?: string; // <-- Adicione esta linha (o ? torna ela opcional)
     featured?: boolean;
 }

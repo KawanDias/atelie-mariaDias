@@ -7,12 +7,26 @@ import type { Product } from '../types';
 function FavoritesPage() {
     const { favorites } = useFavorites();
     const [favoriteProducts, setFavoriteProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const allProducts = getProducts();
-        const favorited = allProducts.filter((p) => favorites.includes(p.id.toString()));
-        setFavoriteProducts(favorited);
+        async function loadFavorites() {
+            try {
+                const allProducts = await getProducts();
+                const favorited = allProducts.filter((p) => favorites.includes(p.id.toString()));
+                setFavoriteProducts(favorited);
+            } catch (error) {
+                console.error("Erro ao carregar favoritos:", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadFavorites();
     }, [favorites]);
+
+    if (loading) {
+        return <div style={{ textAlign: 'center', padding: '4rem', color: '#b58b8b' }}>Carregando favoritos...</div>;
+    }
 
     return (
         <section className="container">

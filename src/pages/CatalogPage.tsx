@@ -1,21 +1,50 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import { getProducts } from '../services/productService';
+import type { Product } from '../types';
 
 function CatalogPage() {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const urlBusca = searchParams.get('busca') || '';
 
+    const [searchTerm, setSearchTerm] = useState(urlBusca);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<'price-asc' | 'price-desc' | 'recent'>('recent');
 
-    const products = getProducts();
+    useEffect(() => {
+        async function loadProducts() {
+            try {
+                const data = await getProducts();
+                setProducts(data || []);
+            } catch (error) {
+                console.error("Erro ao carregar produtos:", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadProducts();
+    }, []);
+
+    useEffect(() => {
+        setSearchTerm(urlBusca);
+    }, [urlBusca]);
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchTerm(value);
+        if (value) {
+            setSearchParams({ busca: value });
+        } else {
+            setSearchParams({});
+        }
+    };
 
     const filteredProducts = useMemo(() => {
-        let filtered = products;
+        let filtered: Product[] = products;
 
-        // Filtro por termo de busca (da URL ou do Header)
         if (urlBusca) {
             filtered = filtered.filter(
                 (p) =>
@@ -24,12 +53,10 @@ function CatalogPage() {
             );
         }
 
-        // Filtro por categoria
         if (selectedCategory) {
             filtered = filtered.filter((p) => p.category === selectedCategory);
         }
 
-        // Ordenação
         const sorted = [...filtered];
         if (sortBy === 'price-asc') {
             sorted.sort((a, b) => parseFloat(a.price.replace('R$ ', '').replace(',', '.')) - parseFloat(b.price.replace('R$ ', '').replace(',', '.')));
@@ -42,9 +69,12 @@ function CatalogPage() {
 
     const categories = ['Enxoval de Bebê', 'Batizado', 'Toalhas Personalizadas', 'Acessórios & Maternidade', 'Decoração do Quartinho'];
 
+    if (loading) {
+        return <div style={{ textAlign: 'center', padding: '4rem', color: '#b58b8b' }}>Carregando catálogo...</div>;
+    }
+
     return (
         <section style={{ padding: '3rem 1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
-            {/* Título da Seção */}
             <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
                 <h2 style={{ fontSize: '2rem', color: '#5e4e4e', fontWeight: 400, marginBottom: '0.4rem' }}>
                     {urlBusca ? `Resultados para "${urlBusca}"` : 'Nosso Catálogo'}
@@ -54,7 +84,7 @@ function CatalogPage() {
                 </p>
             </div>
 
-            {/* Barra de Filtros e Ordenação Compacta e Delicada */}
+            {/* Barra de Filtros e Busca Compacta */}
             <div style={{ 
                 display: 'flex', 
                 justifyContent: 'space-between', 
@@ -62,7 +92,7 @@ function CatalogPage() {
                 flexWrap: 'wrap', 
                 gap: '1rem', 
                 background: '#ffffff', 
-                padding: '1.2rem 1.8rem', 
+                padding: '1rem 1.5rem', 
                 borderRadius: '20px', 
                 border: '1px solid #f2e6e6',
                 boxShadow: '0 4px 20px rgba(230, 200, 200, 0.12)',
@@ -78,7 +108,6 @@ function CatalogPage() {
                             borderRadius: '20px',
                             border: '1px solid #e8dada',
                             cursor: 'pointer',
-                            transition: 'all 0.2s',
                             background: !selectedCategory ? '#b58b8b' : '#faf6f6', 
                             color: !selectedCategory ? '#fff' : '#7a6666',
                             fontWeight: !selectedCategory ? 600 : 400
@@ -96,7 +125,6 @@ function CatalogPage() {
                                 borderRadius: '20px',
                                 border: '1px solid #e8dada',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s',
                                 background: selectedCategory === cat ? '#b58b8b' : '#faf6f6', 
                                 color: selectedCategory === cat ? '#fff' : '#7a6666',
                                 fontWeight: selectedCategory === cat ? 600 : 400
@@ -107,7 +135,36 @@ function CatalogPage() {
                     ))}
                 </div>
 
-                {/* Seletor de Ordenação Discreto */}
+                {/* Campo de Busca Delicado e Mais Baixo */}
+                <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    background: '#faf6f6', 
+                    border: '1px solid #e8dada', 
+                    borderRadius: '20px', 
+                    padding: '0.3rem 0.8rem', 
+                    minWidth: '220px',
+                    height: '34px' 
+                }}>
+                    <span style={{ marginRight: '0.4rem', fontSize: '0.8rem' }}>🔍</span>
+                    <input 
+                        type="text" 
+                        placeholder="Buscar peça..." 
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        style={{
+                            border: 'none',
+                            background: 'transparent',
+                            outline: 'none',
+                            boxShadow: 'none',
+                            fontSize: '0.82rem',
+                            color: '#7a6666',
+                            width: '100%'
+                        }}
+                    />
+                </div>
+
+                {/* Seletor de Ordenação */}
                 <div>
                     <select 
                         value={sortBy} 
@@ -120,7 +177,8 @@ function CatalogPage() {
                             fontSize: '0.82rem',
                             color: '#7a6666',
                             outline: 'none',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            height: '34px'
                         }}
                     >
                         <option value="recent">Mais Recentes</option>
@@ -130,14 +188,12 @@ function CatalogPage() {
                 </div>
             </div>
 
-            {/* Contador de produtos sutis */}
             <div style={{ paddingLeft: '0.5rem', marginBottom: '1.5rem' }}>
                 <span style={{ color: '#a38f8f', fontSize: '0.85rem' }}>
                     {filteredProducts.length} produto(s) encontrado(s)
                 </span>
             </div>
 
-            {/* Grade de Produtos */}
             <div className="grid products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
                 {filteredProducts.length > 0 ? (
                     filteredProducts.map((product) => <ProductCard key={product.id} product={product} />)
