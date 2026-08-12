@@ -74,7 +74,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.9rem', fontSize: '0.75rem', color: '#a38f8f' }}>
                 <span>{product.category}</span>
                 <span style={{ background: '#faf6f6', padding: '0.15rem 0.5rem', borderRadius: '10px', border: '1px solid #f2e6e6' }}>
-                    {product.featured ? 'Exclusivo' : 'Personalizável'}
+                    Personalizável
                 </span>
             </div>
 

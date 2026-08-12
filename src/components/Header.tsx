@@ -142,7 +142,7 @@ function Header() {
                 </div>
             </div>
 
-            {/* Barra inferior de categorias */}
+            {/* Barra inferior de categorias e serviços */}
             <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1.5rem 0.75rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 <nav style={{ display: 'flex', gap: '2rem', fontSize: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <Link to="/catalogo" style={{ color: '#b58b8b', fontWeight: 600, textDecoration: 'none' }}>✨ Todos</Link>
@@ -151,6 +151,7 @@ function Header() {
                     <Link to="/catalogo" style={{ color: '#7a6666', textDecoration: 'none' }}>Toalhas Personalizadas</Link>
                     <Link to="/catalogo" style={{ color: '#7a6666', textDecoration: 'none' }}>Acessórios & Maternidade</Link>
                     <Link to="/catalogo" style={{ color: '#7a6666', textDecoration: 'none' }}>Decoração do Quartinho</Link>
+                    <Link to="/consertos" style={{ color: '#b58b8b', fontWeight: 600, textDecoration: 'none' }}>🪡 Consertos e Ajustes</Link>
                 </nav>
             </div>
         </header>

@@ -15,6 +15,7 @@ function AdminPage() {
         description: '',
         category: 'Enxoval de Bebê' as ProductCategory,
         price: '',
+        measurements: '', // Novo campo para medidas
         images: [] as string[],
         featured: false,
     });
@@ -77,6 +78,7 @@ function AdminPage() {
             description: product.description,
             category: product.category,
             price: product.price,
+            measurements: product.measurements || '',
             images: existingImages,
             featured: product.featured || false,
         });
@@ -89,6 +91,7 @@ function AdminPage() {
             description: '',
             category: 'Enxoval de Bebê',
             price: '',
+            measurements: '',
             images: [],
             featured: false,
         });
@@ -120,6 +123,7 @@ function AdminPage() {
             description: formData.description,
             category: formData.category,
             price: formData.price,
+            measurements: formData.measurements,
             image: formData.images[0],
             images: formData.images,
             featured: formData.featured,
@@ -217,6 +221,18 @@ function AdminPage() {
                                 style={inputStyle}
                             />
                         </div>
+                    </div>
+
+                    {/* Novo campo de Medidas */}
+                    <div>
+                        <label style={labelStyle}>Medidas / Tamanho da Peça</label>
+                        <input 
+                            type="text" 
+                            placeholder="Ex: 70cm x 140cm, Berço Americano, Tamanho Único..." 
+                            value={formData.measurements} 
+                            onChange={(e) => setFormData({ ...formData, measurements: e.target.value })} 
+                            style={inputStyle}
+                        />
                     </div>
 
                     <div>
@@ -377,7 +393,9 @@ function AdminPage() {
                                     <strong style={{ display: 'block', color: '#5e4e4e', fontSize: '0.95rem' }}>
                                         {product.title} {product.featured && '⭐'}
                                     </strong>
-                                    <span style={{ fontSize: '0.8rem', color: '#a38f8f' }}>{product.category} • {product.price}</span>
+                                    <span style={{ fontSize: '0.8rem', color: '#a38f8f' }}>
+                                        {product.category} • {product.price} {product.measurements && `• Medidas: ${product.measurements}`}
+                                    </span>
                                 </div>
                             </Link>
 

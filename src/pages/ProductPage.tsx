@@ -170,7 +170,26 @@ export function ProductPage() {
                         {product.category}
                     </span>
                     <h1 style={{ fontSize: '1.8rem', color: '#4a3b32', margin: '0.5rem 0' }}>{product.title}</h1>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '1.5rem' }}>{product.price}</p>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '1rem' }}>{product.price}</p>
+
+                    {/* Exibição das Medidas (caso exista) */}
+                    {product.measurements && (
+                        <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '0.5rem', 
+                            background: '#faf6f6', 
+                            padding: '0.6rem 1rem', 
+                            borderRadius: '10px', 
+                            border: '1px solid #f2e6e6',
+                            marginBottom: '1.2rem' 
+                        }}>
+                            <span style={{ fontSize: '1rem' }}>📏</span>
+                            <span style={{ fontSize: '0.9rem', color: '#7a6666' }}>
+                                <strong>Medidas:</strong> {product.measurements}
+                            </span>
+                        </div>
+                    )}
 
                     <div style={{ background: '#fff', padding: '1.2rem', borderRadius: '12px', border: '1px solid #eee', marginBottom: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: '#4a3b32' }}>Descrição do Produto</h3>
@@ -179,12 +198,12 @@ export function ProductPage() {
 
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         <a 
-                            href={`https://wa.me/5500000000000?text=Olá!%20Gostaria%20de%20encomendar%20o%20produto:%20${encodeURIComponent(product.title)}`}
+                            href={`https://wa.me/5542984230849?text=Olá!%20Gostaria%20de%20encomendar%20o%20produto:%20${encodeURIComponent(product.title)}`}
                             target="_blank" 
                             rel="noopener noreferrer"
                             style={{
                                 flex: 1,
-                                background: 'var(--primary)',
+                                background: '#b58b8b',
                                 color: 'white',
                                 textAlign: 'center',
                                 padding: '0.8rem',

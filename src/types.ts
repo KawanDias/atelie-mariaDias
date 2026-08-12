@@ -7,6 +7,7 @@ export interface Product {
     category: ProductCategory;
     price: string;
     images: string[]; 
-    image?: string; // <-- Adicione esta linha (o ? torna ela opcional)
+    image?: string; 
     featured?: boolean;
+    measurements?: string; // <-- Novo campo opcional para as medidas da peça
 }
