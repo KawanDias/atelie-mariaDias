@@ -19,7 +19,7 @@ export function Footer() {
             }}>
                 {/* Lado Esquerdo: Marca e Direitos */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ fontWeight: 600, color: '#5e4e4e' }}>Ateliê de Costura Criativa</span>
+                    <span style={{ fontWeight: 600, color: '#5e4e4e' }}>Ateliê Maria Dias</span>
                     <span style={{ color: '#d9c2c2' }}>|</span>
                     <span>© {new Date().getFullYear()} Todos os direitos reservados.</span>
                 </div>

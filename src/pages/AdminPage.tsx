@@ -7,26 +7,25 @@ import { mockProducts } from '../data/products';
 
 function AdminPage() {
     const [products, setProducts] = useState<Product[]>([]);
-    const [isEditing, setIsEditing] = useState<number | null>(null);
-    const [itemToDelete, setItemToDelete] = useState<{ id: number; title: string } | null>(null);
+    const [isEditing, setIsEditing] = useState<number | string | null>(null);
+    const [itemToDelete, setItemToDelete] = useState<{ id: number | string; title: string } | null>(null);
 
     const [formData, setFormData] = useState({
         title: '',
         description: '',
         category: 'Enxoval de Bebê' as ProductCategory,
         price: '',
-        measurements: '', // Novo campo para medidas
+        measurements: '',
         images: [] as string[],
         featured: false,
     });
 
-    // Carrega os produtos do IndexedDB ao abrir a página
     useEffect(() => {
         async function loadData() {
             let data = await productService.getProducts();
             if (data.length === 0 && mockProducts.length > 0) {
                 await productService.saveProducts(mockProducts);
-                data = mockProducts;
+                data = await productService.getProducts();
             }
             setProducts(data);
         }
@@ -38,6 +37,7 @@ function AdminPage() {
         setProducts(data);
     };
 
+    // Upload de imagem com redimensionamento e compressão em Canvas
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
 
@@ -49,10 +49,33 @@ function AdminPage() {
         files.forEach((file) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-                setFormData((prev) => ({
-                    ...prev,
-                    images: [...prev.images, reader.result as string].slice(0, 4),
-                }));
+                const img = new Image();
+                img.src = reader.result as string;
+
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > MAX_WIDTH) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+                    setFormData((prev) => ({
+                        ...prev,
+                        images: [...prev.images, compressedBase64].slice(0, 4),
+                    }));
+                };
             };
             reader.readAsDataURL(file);
         });
@@ -99,8 +122,7 @@ function AdminPage() {
 
     const confirmDelete = async () => {
         if (itemToDelete !== null) {
-            const updated = products.filter((p) => p.id !== itemToDelete.id);
-            await productService.saveProducts(updated);
+            await productService.deleteProduct(itemToDelete.id);
             await refreshProducts();
             setItemToDelete(null);
             toast.success('Produto removido com sucesso!');
@@ -115,10 +137,8 @@ function AdminPage() {
             return;
         }
 
-        const newId = isEditing ? isEditing : (products.length > 0 ? Math.max(...products.map((p) => Number(p.id) || 0)) + 1 : 1);
-
         const productPayload: Product = {
-            id: newId,
+            id: (isEditing !== null ? isEditing : Date.now()) as any,
             title: formData.title,
             description: formData.description,
             category: formData.category,
@@ -129,17 +149,20 @@ function AdminPage() {
             featured: formData.featured,
         };
 
-        if (isEditing) {
-            const updated = products.map((p) => (p.id === isEditing ? productPayload : p));
-            await productService.saveProducts(updated);
-            toast.success('Produto atualizado com sucesso!');
-        } else {
-            await productService.addProduct(productPayload);
-            toast.success('Produto cadastrado com sucesso!');
-        }
+        try {
+            if (isEditing !== null) {
+                await productService.updateProduct(isEditing, productPayload);
+                toast.success('Produto atualizado com sucesso!');
+            } else {
+                await productService.addProduct(productPayload);
+                toast.success('Produto cadastrado com sucesso!');
+            }
 
-        await refreshProducts();
-        handleCancel();
+            await refreshProducts();
+            handleCancel();
+        } catch (error) {
+            toast.error('Erro ao salvar produto. Verifique a conexão.');
+        }
     };
 
     const cardStyle = { 
@@ -180,7 +203,7 @@ function AdminPage() {
             {/* Formulário de Cadastro / Edição */}
             <div style={cardStyle}>
                 <h2 style={{ fontSize: '1.3rem', marginBottom: '1.5rem', color: '#b58b8b', fontWeight: 400 }}>
-                    {isEditing ? 'Editar Produto' : 'Cadastrar Novo Produto'}
+                    {isEditing !== null ? 'Editar Produto' : 'Cadastrar Novo Produto'}
                 </h2>
 
                 <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.2rem' }}>
@@ -223,7 +246,6 @@ function AdminPage() {
                         </div>
                     </div>
 
-                    {/* Novo campo de Medidas */}
                     <div>
                         <label style={labelStyle}>Medidas / Tamanho da Peça</label>
                         <input 
@@ -337,9 +359,9 @@ function AdminPage() {
                                 transition: 'opacity 0.2s'
                             }}
                         >
-                            {isEditing ? 'Salvar Alterações' : 'Cadastrar Produto'}
+                            {isEditing !== null ? 'Salvar Alterações' : 'Cadastrar Produto'}
                         </button>
-                        {isEditing && (
+                        {isEditing !== null && (
                             <button 
                                 type="button" 
                                 onClick={handleCancel} 
@@ -418,7 +440,7 @@ function AdminPage() {
                 })}
             </div>
 
-            {/* Modal Personalizado de Confirmação com Nome do Produto */}
+            {/* Modal de Confirmação */}
             {itemToDelete !== null && (
                 <div style={{
                     position: 'fixed',

@@ -1,18 +1,32 @@
-import localforage from 'localforage';
-import { Product } from '../types';
+import { db } from './firebase';
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  addDoc 
+} from 'firebase/firestore';
+import type { Product } from '../types';
 
-const PRODUCTS_KEY = 'atelie_products';
+const COLLECTION_NAME = 'produtos';
 
-localforage.config({
-  name: 'AtelieMariaDias',
-  storeName: 'products_store'
-});
-
-// Funções individuais exportadas para compatibilidade com o resto do site
+// Funções individuais exportadas para compatibilidade
 export async function getProducts(): Promise<Product[]> {
   try {
-    const products = await localforage.getItem<Product[]>(PRODUCTS_KEY);
-    return products || [];
+    const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
+    const products: Product[] = [];
+    
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      products.push({
+        ...data,
+        id: docSnap.id,
+      } as unknown as Product);
+    });
+
+    return products;
   } catch (error) {
     console.error('Erro ao buscar produtos:', error);
     return [];
@@ -20,28 +34,56 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 export async function saveProducts(products: Product[]): Promise<void> {
-  await localforage.setItem(PRODUCTS_KEY, products);
+  try {
+    for (const product of products) {
+      if (product.id !== undefined && product.id !== null) {
+        const docRef = doc(db, COLLECTION_NAME, String(product.id));
+        await setDoc(docRef, product, { merge: true });
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao salvar produtos no Firestore:', error);
+  }
 }
 
 export async function addProduct(newProduct: Product): Promise<Product[]> {
-  const products = await getProducts();
-  const updatedProducts = [newProduct, ...products];
-  await saveProducts(updatedProducts);
-  return updatedProducts;
+  try {
+    if (newProduct.id) {
+      const docRef = doc(db, COLLECTION_NAME, String(newProduct.id));
+      await setDoc(docRef, newProduct);
+    } else {
+      await addDoc(collection(db, COLLECTION_NAME), {
+        ...newProduct,
+        createdAt: new Date(),
+      });
+    }
+    return await getProducts();
+  } catch (error) {
+    console.error('Erro ao adicionar produto:', error);
+    return await getProducts();
+  }
 }
 
-export async function updateProduct(id: number, updatedData: Partial<Product>): Promise<Product[]> {
-  const products = await getProducts();
-  const updatedProducts = products.map((p) => (p.id === id ? { ...p, ...updatedData } : p));
-  await saveProducts(updatedProducts);
-  return updatedProducts;
+export async function updateProduct(id: number | string, updatedData: Partial<Product>): Promise<Product[]> {
+  try {
+    const docRef = doc(db, COLLECTION_NAME, String(id));
+    await updateDoc(docRef, updatedData);
+    return await getProducts();
+  } catch (error) {
+    console.error('Erro ao atualizar produto:', error);
+    return await getProducts();
+  }
 }
 
-export async function deleteProduct(id: number): Promise<Product[]> {
-  const products = await getProducts();
-  const updatedProducts = products.filter((p) => p.id !== id);
-  await saveProducts(updatedProducts);
-  return updatedProducts;
+export async function deleteProduct(id: number | string): Promise<Product[]> {
+  try {
+    const docRef = doc(db, COLLECTION_NAME, String(id));
+    await deleteDoc(docRef);
+    return await getProducts();
+  } catch (error) {
+    console.error('Erro ao deletar produto:', error);
+    return await getProducts();
+  }
 }
 
 export async function initializeDefaultProducts(defaultProducts: Product[]): Promise<void> {
@@ -51,7 +93,7 @@ export async function initializeDefaultProducts(defaultProducts: Product[]): Pro
   }
 }
 
-// Objeto agrupado caso algum arquivo use productService
+// Objeto agrupado para compatibilidade
 export const productService = {
   getProducts,
   saveProducts,

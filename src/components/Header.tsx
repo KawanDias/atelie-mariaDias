@@ -6,11 +6,25 @@ import { useFavorites } from '../contexts/FavoritesContext';
 // @ts-ignore
 import logoImg from '../assets/logo.png';
 
+// Lista de e-mails com permissão de Administrador (igual ao Firestore Security Rules)
+const ADMIN_EMAILS = [
+    'kawdeveloper@gmail.com',
+    'mariagbdias@gmail.com'
+];
+
 function Header() {
     const { user, logout } = useAuth();
     const { favorites } = useFavorites();
     const [searchTerm, setSearchTerm] = useState('');
     const navigate = useNavigate();
+
+    // Verifica se o usuário logado é admin (por role ou por e-mail)
+    const isAdmin = Boolean(
+        user && (
+            user.role === 'admin' || 
+            (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase()))
+        )
+    );
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -76,10 +90,11 @@ function Header() {
                     {user ? (
                         <>
                             <span style={{ fontSize: '0.85rem', color: '#b58b8b', fontWeight: 600 }}>
-                                👤 {user.name}
+                                👤 {user.name || 'Usuário'}
                             </span>
 
-                            {user.role === 'admin' && (
+                            {/* Botão Admin condicional */}
+                            {isAdmin && (
                                 <Link 
                                     to="/admin" 
                                     style={{ 

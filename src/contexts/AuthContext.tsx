@@ -1,11 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut, 
+    onAuthStateChanged,
+    updateProfile 
+} from 'firebase/auth';
+import { auth } from '../services/firebase';
 
 export interface User {
     id: string;
     email: string;
     name: string;
     role: 'client' | 'admin';
-    password?: string;
 }
 
 interface AuthContextType {
@@ -16,116 +23,69 @@ interface AuthContextType {
     logout: () => void;
 }
 
-// Credenciais fixas da Administração
 const ADMIN_EMAIL = 'mariagbdias@gmail.com';
-const ADMIN_PASSWORD = 'Tn0adgll'; // Altere para a senha que desejar
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Carrega o usuário do localStorage ao iniciar
     useEffect(() => {
-        const savedUser = localStorage.getItem('atelie_user');
-        if (savedUser) {
-            try {
-                const parsed = JSON.parse(savedUser);
-                setUser(parsed);
-            } catch {
-                localStorage.removeItem('atelie_user');
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            if (firebaseUser) {
+                const isAdmin = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+                setUser({
+                    id: firebaseUser.uid,
+                    email: firebaseUser.email || '',
+                    name: firebaseUser.displayName || (isAdmin ? 'Administradora' : 'Usuário'),
+                    role: isAdmin ? 'admin' : 'client',
+                });
+            } else {
+                setUser(null);
             }
-        }
-        setIsLoading(false);
+            setIsLoading(false);
+        });
+        return () => unsubscribe();
     }, []);
 
-    const getUsers = (): User[] => {
-        const saved = localStorage.getItem('atelie_users');
-        return saved ? JSON.parse(saved) : [];
-    };
-
-    const saveUsers = (users: User[]) => {
-        localStorage.setItem('atelie_users', JSON.stringify(users));
-    };
-
     const login = async (email: string, password: string) => {
-        // 1. Autenticação direta do Administrador via credenciais fixas
-        if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-            if (password !== ADMIN_PASSWORD) {
-                throw new Error('Email ou senha inválidos');
-            }
-
-            const adminUser: User = {
-                id: 'admin-master',
-                email: ADMIN_EMAIL,
-                name: 'Administradora',
-                role: 'admin',
-            };
-
-            setUser(adminUser);
-            localStorage.setItem('atelie_user', JSON.stringify(adminUser));
-            return;
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error: any) {
+            console.error("ERRO LOGIN FIREBASE:", error.code, error.message);
+            throw new Error(error.message);
         }
-
-        // 2. Autenticação de clientes comuns no localStorage
-        const users = getUsers();
-        const foundUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-
-        if (!foundUser || foundUser.password !== password) {
-            throw new Error('Email ou senha inválidos');
-        }
-
-        const userToSet: User = {
-            id: foundUser.id,
-            email: foundUser.email,
-            name: foundUser.name,
-            role: 'client',
-        };
-
-        setUser(userToSet);
-        localStorage.setItem('atelie_user', JSON.stringify(userToSet));
     };
 
     const signup = async (name: string, email: string, password: string) => {
-        // Bloqueia tentativas de cadastrar a conta de administrador via formulário público
         if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
             throw new Error('Este e-mail é reservado para a administração.');
         }
 
-        const users = getUsers();
+        try {
+            console.log("Tentando criar usuário no Firebase...");
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            
+            await updateProfile(userCredential.user, { displayName: name });
 
-        // Verifica se o e-mail já existe
-        if (users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
-            throw new Error('Este email já está cadastrado');
+            setUser({
+                id: userCredential.user.uid,
+                email: email,
+                name: name,
+                role: 'client'
+            });
+            console.log("Usuário criado com sucesso!");
+        } catch (error: any) {
+            // MOSTRA O ERRO REAL BRUTO NO CONSOLE
+            console.error("ERRO COMPLETO DO FIREBASE (CODE):", error.code);
+            console.error("ERRO COMPLETO DO FIREBASE (MESSAGE):", error.message);
+            throw new Error(`Firebase [${error.code}]: ${error.message}`);
         }
-
-        // Todo novo cadastro público é criado estritamente como 'client'
-        const newUser: User = {
-            id: Date.now().toString(),
-            email,
-            name,
-            password,
-            role: 'client',
-        };
-
-        users.push(newUser);
-        saveUsers(users);
-
-        const userToSet: User = {
-            id: newUser.id,
-            email: newUser.email,
-            name: newUser.name,
-            role: newUser.role,
-        };
-
-        setUser(userToSet);
-        localStorage.setItem('atelie_user', JSON.stringify(userToSet));
     };
 
-    const logout = () => {
+    const logout = async () => {
+        await signOut(auth);
         setUser(null);
-        localStorage.removeItem('atelie_user');
     };
 
     return (

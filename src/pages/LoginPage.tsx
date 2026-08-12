@@ -41,7 +41,8 @@ function LoginPage() {
                 await login(formData.email, formData.password);
             }
             navigate('/');
-        } catch (err) {
+        } catch (err: any) {
+            console.error("Erro detalhado no Auth/Firebase:", err); // Ajuda a debugar no F12
             setError(err instanceof Error ? err.message : 'Erro ao processar');
         } finally {
             setLoading(false);
@@ -85,7 +86,7 @@ function LoginPage() {
                         name="password"
                         value={formData.password}
                         onChange={handleChange}
-                        placeholder="••••••••"
+                        placeholder="Mínimo de 6 dígitos"
                         required
                     />
 
@@ -97,7 +98,7 @@ function LoginPage() {
                                 name="confirmPassword"
                                 value={formData.confirmPassword}
                                 onChange={handleChange}
-                                placeholder="••••••••"
+                                placeholder="Repita a senha"
                                 required
                             />
                         </>
@@ -111,6 +112,7 @@ function LoginPage() {
                 <p style={{ marginTop: '1rem', textAlign: 'center', color: '#a89a97' }}>
                     {isSignup ? 'Já tem conta? ' : 'Não tem conta? '}
                     <button
+                        type="button"
                         onClick={() => {
                             setIsSignup(!isSignup);
                             setError('');

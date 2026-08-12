@@ -15,7 +15,8 @@ export function ProductPage() {
         async function fetchProduct() {
             try {
                 const products = await getProducts();
-                const found = products.find((p) => p.id === Number(id));
+                // Comparação segura convertendo ambos os IDs para String
+                const found = products.find((p) => String(p.id) === String(id));
                 setProduct(found || null);
             } catch (error) {
                 console.error("Erro ao carregar produto:", error);
@@ -41,7 +42,7 @@ export function ProductPage() {
         );
     }
 
-    const productIdStr = product.id.toString();
+    const productIdStr = String(product.id);
     const fav = isFavorite(productIdStr);
 
     // Compatibilidade com array de imagens ou imagem única antiga
