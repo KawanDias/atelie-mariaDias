@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import { getProducts } from '../services/productService';
-import type { Product } from '../types'; // Importando o tipo Product
+import type { Product } from '../types';
 
 function HomePage() {
     const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -78,23 +78,7 @@ function HomePage() {
                                 transition: 'opacity 0.2s'
                             }}
                         >
-                            Ver enxoval
-                        </Link>
-                        <Link 
-                            to="/login" 
-                            style={{ 
-                                background: '#ffffff', 
-                                color: '#7a6666', 
-                                padding: '0.7rem 1.5rem', 
-                                borderRadius: '14px', 
-                                fontWeight: 500, 
-                                fontSize: '0.9rem',
-                                textDecoration: 'none',
-                                border: '1px solid #e8dada',
-                                transition: 'background 0.2s'
-                            }}
-                        >
-                            Minha conta
+                            Ver catálogo
                         </Link>
                     </div>
                 </div>

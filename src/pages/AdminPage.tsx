@@ -10,6 +10,10 @@ function AdminPage() {
     const [isEditing, setIsEditing] = useState<number | string | null>(null);
     const [itemToDelete, setItemToDelete] = useState<{ id: number | string; title: string } | null>(null);
 
+    // Estados para Filtro e Busca
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
+
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -105,6 +109,9 @@ function AdminPage() {
             images: existingImages,
             featured: product.featured || false,
         });
+
+        // Rola suavemente até o formulário de edição
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancel = () => {
@@ -164,6 +171,14 @@ function AdminPage() {
             toast.error('Erro ao salvar produto. Verifique a conexão.');
         }
     };
+
+    // Lógica de filtragem dos produtos
+    const filteredProducts = products.filter((product) => {
+        const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              product.description.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = selectedCategory === 'Todas' || product.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
 
     const cardStyle = { 
         background: '#ffffff', 
@@ -374,70 +389,126 @@ function AdminPage() {
                 </form>
             </div>
 
-            {/* Lista de Produtos Cadastrados */}
-            <h2 style={{ fontSize: '1.2rem', marginBottom: '1.2rem', color: '#b58b8b', fontWeight: 400 }}>
-                Produtos Cadastrados ({products.length})
-            </h2>
-            
+            {/* Cabeçalho de Produtos Cadastrados */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+                <h2 style={{ fontSize: '1.2rem', color: '#b58b8b', fontWeight: 400, margin: 0 }}>
+                    Produtos Cadastrados ({filteredProducts.length} de {products.length})
+                </h2>
+            </div>
+
+            {/* BARRA DE PESQUISA E FILTROS */}
+            <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1.5fr 1fr', 
+                gap: '1rem', 
+                marginBottom: '1.5rem',
+                background: '#ffffff',
+                padding: '1.2rem',
+                borderRadius: '16px',
+                border: '1px solid #f2e6e6',
+                boxShadow: '0 2px 8px rgba(230, 200, 200, 0.08)'
+            }}>
+                <div>
+                    <label style={labelStyle}>🔍 Buscar produto</label>
+                    <input 
+                        type="text"
+                        placeholder="Digite o nome ou descrição..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={inputStyle}
+                    />
+                </div>
+
+                <div>
+                    <label style={labelStyle}>📁 Categoria</label>
+                    <select 
+                        value={selectedCategory} 
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        style={inputStyle}
+                    >
+                        <option value="Todas">Todas as Categorias</option>
+                        <option value="Enxoval de Bebê">Enxoval de Bebê</option>
+                        <option value="Batizado">Batizado</option>
+                        <option value="Toalhas Personalizadas">Toalhas Personalizadas</option>
+                        <option value="Acessórios & Maternidade">Acessórios & Maternidade</option>
+                        <option value="Decoração do Quartinho">Decoração do Quartinho</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Lista de Produtos Filtrados */}
             <div style={{ display: 'grid', gap: '0.8rem' }}>
-                {products.map((product) => {
-                    const productImages = (product as any).images || ((product as any).image ? [(product as any).image] : []);
-                    const mainImage = productImages[0] || '';
-                    const isUrl = mainImage.startsWith('http') || mainImage.startsWith('data:');
+                {filteredProducts.length > 0 ? (
+                    filteredProducts.map((product) => {
+                        const productImages = (product as any).images || ((product as any).image ? [(product as any).image] : []);
+                        const mainImage = productImages[0] || '';
+                        const isUrl = mainImage.startsWith('http') || mainImage.startsWith('data:');
 
-                    return (
-                        <div key={product.id} style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'space-between', 
-                            background: '#fff', 
-                            padding: '1rem 1.2rem', 
-                            borderRadius: '16px', 
-                            border: '1px solid #f2e6e6',
-                            boxShadow: '0 2px 8px rgba(230, 200, 200, 0.08)'
-                        }}>
-                            <Link 
-                                to={`/produto/${product.id}`} 
-                                style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none', color: 'inherit', flex: 1 }}
-                            >
-                                {isUrl ? (
-                                    <img 
-                                        src={mainImage} 
-                                        alt={product.title} 
-                                        style={{ width: '55px', height: '55px', objectFit: 'cover', borderRadius: '10px' }} 
-                                    />
-                                ) : (
-                                    <div style={{ width: '55px', height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf6f6', borderRadius: '10px', fontSize: '1.5rem' }}>
-                                        {mainImage || '🖼️'}
+                        return (
+                            <div key={product.id} style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                background: '#fff', 
+                                padding: '1rem 1.2rem', 
+                                borderRadius: '16px', 
+                                border: '1px solid #f2e6e6',
+                                boxShadow: '0 2px 8px rgba(230, 200, 200, 0.08)'
+                            }}>
+                                <Link 
+                                    to={`/produto/${product.id}`} 
+                                    style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none', color: 'inherit', flex: 1 }}
+                                >
+                                    {isUrl ? (
+                                        <img 
+                                            src={mainImage} 
+                                            alt={product.title} 
+                                            style={{ width: '55px', height: '55px', objectFit: 'cover', borderRadius: '10px' }} 
+                                        />
+                                    ) : (
+                                        <div style={{ width: '55px', height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf6f6', borderRadius: '10px', fontSize: '1.5rem' }}>
+                                            {mainImage || '🖼️'}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <strong style={{ display: 'block', color: '#5e4e4e', fontSize: '0.95rem' }}>
+                                            {product.title} {product.featured && '⭐'}
+                                        </strong>
+                                        <span style={{ fontSize: '0.8rem', color: '#a38f8f' }}>
+                                            {product.category} • {product.price} {product.measurements && `• Medidas: ${product.measurements}`}
+                                        </span>
                                     </div>
-                                )}
-                                <div>
-                                    <strong style={{ display: 'block', color: '#5e4e4e', fontSize: '0.95rem' }}>
-                                        {product.title} {product.featured && '⭐'}
-                                    </strong>
-                                    <span style={{ fontSize: '0.8rem', color: '#a38f8f' }}>
-                                        {product.category} • {product.price} {product.measurements && `• Medidas: ${product.measurements}`}
-                                    </span>
-                                </div>
-                            </Link>
+                                </Link>
 
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button 
-                                    onClick={() => handleEdit(product)} 
-                                    style={{ background: '#f7eded', border: 'none', padding: '0.5rem 1rem', borderRadius: '10px', cursor: 'pointer', color: '#b58b8b', fontWeight: 500, fontSize: '0.85rem' }}
-                                >
-                                    ✏️ Editar
-                                </button>
-                                <button 
-                                    onClick={() => setItemToDelete({ id: product.id, title: product.title })} 
-                                    style={{ background: '#fce8e8', color: '#d98282', border: 'none', padding: '0.5rem 1rem', borderRadius: '10px', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
-                                >
-                                    🗑️ Excluir
-                                </button>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button 
+                                        onClick={() => handleEdit(product)} 
+                                        style={{ background: '#f7eded', border: 'none', padding: '0.5rem 1rem', borderRadius: '10px', cursor: 'pointer', color: '#b58b8b', fontWeight: 500, fontSize: '0.85rem' }}
+                                    >
+                                        ✏️ Editar
+                                    </button>
+                                    <button 
+                                        onClick={() => setItemToDelete({ id: product.id, title: product.title })} 
+                                        style={{ background: '#fce8e8', color: '#d98282', border: 'none', padding: '0.5rem 1rem', borderRadius: '10px', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
+                                    >
+                                        🗑️ Excluir
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })
+                ) : (
+                    <div style={{ 
+                        textAlign: 'center', 
+                        padding: '2.5rem 1rem', 
+                        background: '#ffffff', 
+                        borderRadius: '16px', 
+                        border: '1px dashed #e8dada',
+                        color: '#a38f8f' 
+                    }}>
+                        Nenhum produto encontrado com os filtros aplicados.
+                    </div>
+                )}
             </div>
 
             {/* Modal de Confirmação */}
