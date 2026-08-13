@@ -54,12 +54,12 @@ function CatalogPage() {
         }
     };
 
-    // Helper para converter strings de preço (ex: "R$ 1.250,50" ou "120,00") em números válidos
+    // Helper para converter strings de preço em números válidos
     const parsePrice = (priceStr: string): number => {
         if (!priceStr) return 0;
         const cleanStr = priceStr
             .replace(/[^\d,-]/g, '') // Remove R$ e espaços
-            .replace(/\./g, '')       // Remove pontos de milhar
+            .replace(/\./g, '')      // Remove pontos de milhar
             .replace(',', '.');      // Converte vírgula decimal em ponto
         return parseFloat(cleanStr) || 0;
     };
@@ -112,82 +112,212 @@ function CatalogPage() {
     const categories = ['Enxoval de Bebê', 'Batizado', 'Toalhas Personalizadas', 'Acessórios & Maternidade', 'Decoração do Quartinho'];
 
     if (loading) {
-        return <div style={{ textAlign: 'center', padding: '4rem', color: '#A65B5B', fontWeight: 600 }}>Carregando catálogo...</div>;
+        return (
+            <div style={{ textAlign: 'center', padding: '4rem', color: '#A35858', fontWeight: 600 }}>
+                Carregando catálogo...
+            </div>
+        );
     }
 
     return (
-        <section style={{ padding: '3rem 1.5rem 4rem 1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+        <section style={{ padding: '2rem 1.25rem 4rem 1.25rem', maxWidth: '1200px', margin: '0 auto' }}>
+            {/* CSS Responsivo do Catálogo */}
+            <style>{`
+                .custom-banner {
+                    background: linear-gradient(135deg, #FFF9F9 0%, #FAF2F2 100%);
+                    border: 1px solid #F0E3E3;
+                    border-radius: 24px;
+                    padding: 2.5rem 2rem;
+                    text-align: center;
+                    margin-bottom: 2.5rem;
+                    box-shadow: 0 8px 24px rgba(163, 88, 88, 0.06);
+                }
+
+                .custom-banner-title {
+                    color: #2D2323;
+                    font-size: 1.45rem;
+                    margin-bottom: 0.6rem;
+                    font-weight: 700;
+                }
+
+                .custom-banner-subtitle {
+                    color: #625353;
+                    font-size: 0.98rem;
+                    max-width: 600px;
+                    margin: 0 auto 1.5rem auto;
+                    line-height: 1.6;
+                }
+
+                .custom-btn {
+                    background: #A35858;
+                    color: #ffffff;
+                    border: none;
+                    padding: 0.85rem 2.2rem;
+                    border-radius: 14px;
+                    font-size: 0.95rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    box-shadow: 0 4px 14px rgba(163, 88, 88, 0.22);
+                    transition: transform 0.2s, background 0.2s;
+                }
+
+                .custom-btn:hover {
+                    background: #8e4b4b;
+                    transform: translateY(-2px);
+                }
+
+                .filter-panel {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.2rem;
+                    background: #ffffff;
+                    padding: 1.5rem;
+                    border-radius: 20px;
+                    border: 1px solid #F0E3E3;
+                    box-shadow: 0 8px 24px rgba(163, 88, 88, 0.04);
+                    margin-bottom: 2rem;
+                }
+
+                .category-pill {
+                    padding: 0.5rem 1.1rem;
+                    font-size: 0.88rem;
+                    border-radius: 20px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    white-space: nowrap;
+                }
+
+                .search-sort-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                }
+
+                .search-box {
+                    display: flex;
+                    align-items: center;
+                    background: #FAF2F2;
+                    border: 1px solid #F0E3E3;
+                    border-radius: 14px;
+                    padding: 0.5rem 1rem;
+                    flex: 1;
+                    min-width: 260px;
+                    height: 44px;
+                }
+
+                .sort-select {
+                    background: #FAF2F2;
+                    border: 1px solid #F0E3E3;
+                    padding: 0 1rem;
+                    border-radius: 14px;
+                    font-size: 0.9rem;
+                    color: #2D2323;
+                    font-weight: 500;
+                    outline: none;
+                    cursor: pointer;
+                    height: 44px;
+                }
+
+                .catalog-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                    gap: 1.5rem;
+                }
+
+                .form-input, .form-textarea {
+                    width: 100%;
+                    padding: 0.75rem 0.9rem;
+                    border-radius: 12px;
+                    border: 1px solid #F0E3E3;
+                    background: #FAF2F2;
+                    outline: none;
+                    font-size: 0.92rem;
+                    color: #2D2323;
+                    box-sizing: border-box;
+                    transition: border-color 0.2s, background 0.2s;
+                }
+
+                .form-input:focus, .form-textarea:focus {
+                    border-color: #A35858;
+                    background: #FFFFFF;
+                }
+
+                /* Ajustes Mobile */
+                @media (max-width: 768px) {
+                    .custom-banner {
+                        padding: 1.8rem 1.25rem;
+                        border-radius: 20px;
+                    }
+
+                    .custom-banner-title {
+                        font-size: 1.25rem;
+                    }
+
+                    .custom-banner-subtitle {
+                        font-size: 0.9rem;
+                    }
+
+                    .custom-btn {
+                        width: 100%;
+                    }
+
+                    .filter-panel {
+                        padding: 1.2rem;
+                        border-radius: 16px;
+                    }
+
+                    .search-sort-row {
+                        flex-direction: column;
+                        align-items: stretch;
+                    }
+
+                    .search-box, .sort-select {
+                        width: 100%;
+                        box-sizing: border-box;
+                    }
+                }
+            `}</style>
+
             {/* Cabeçalho do Catálogo */}
             <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2.2rem', color: '#2A1B1B', fontWeight: 600, marginBottom: '0.6rem' }}>
+                <h2 style={{ fontSize: '2.2rem', color: '#2D2323', fontWeight: 700, marginBottom: '0.6rem' }}>
                     {urlBusca ? `Resultados para "${urlBusca}"` : 'Nosso Catálogo'}
                 </h2>
-                <p style={{ color: '#4A3C3C', fontSize: '1rem', maxWidth: '620px', margin: '0 auto', lineHeight: '1.6' }}>
+                <p style={{ color: '#625353', fontSize: '1rem', maxWidth: '620px', margin: '0 auto', lineHeight: '1.6' }}>
                     Peças bordadas à mão, personalizadas para trazer amor e elegância ao quartinho do seu filho.
                 </p>
             </div>
 
             {/* Banner de Destaque */}
-            <div style={{
-                background: 'linear-gradient(135deg, #FFF5F5 0%, #F8ECE8 100%)',
-                border: '1px solid #E8D5D5',
-                borderRadius: '24px',
-                padding: '2.5rem 2rem',
-                textAlign: 'center',
-                marginBottom: '2.5rem',
-                boxShadow: '0 8px 24px rgba(80, 50, 50, 0.06)'
-            }}>
-                <h3 style={{ color: '#2A1B1B', fontSize: '1.45rem', marginBottom: '0.6rem', fontWeight: 600 }}>
+            <div className="custom-banner">
+                <h3 className="custom-banner-title">
                     ✨ Quer uma peça exclusiva e feita sob medida?
                 </h3>
-                <p style={{ color: '#4A3C3C', fontSize: '0.98rem', maxWidth: '600px', margin: '0 auto 1.5rem auto', lineHeight: '1.5' }}>
+                <p className="custom-banner-subtitle">
                     Escolha o tema, o tamanho e as cores ideais. Nós preparamos o seu orçamento personalizado direto pelo WhatsApp!
                 </p>
                 <button
                     onClick={() => setIsCustomModalOpen(true)}
-                    style={{
-                        background: '#A65B5B',
-                        color: '#ffffff',
-                        border: 'none',
-                        padding: '0.85rem 2.2rem',
-                        borderRadius: '14px',
-                        fontSize: '0.95rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(166, 91, 91, 0.2)',
-                        transition: 'transform 0.2s, background 0.2s'
-                    }}
+                    className="custom-btn"
                 >
                     Personalizar Peça Agora
                 </button>
             </div>
 
             {/* Painel de Filtros */}
-            <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '1.2rem', 
-                background: '#ffffff', 
-                padding: '1.5rem', 
-                borderRadius: '20px', 
-                border: '1px solid #E8D5D5',
-                boxShadow: '0 8px 24px rgba(80, 50, 50, 0.05)',
-                marginBottom: '2rem' 
-            }}>
+            <div className="filter-panel">
                 {/* Linha 1: Pílulas de Categoria */}
                 <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     <button
                         onClick={() => setSelectedCategory(null)}
+                        className="category-pill"
                         style={{ 
-                            padding: '0.5rem 1.1rem', 
-                            fontSize: '0.88rem', 
-                            borderRadius: '20px',
-                            border: !selectedCategory ? '1px solid #A65B5B' : '1px solid #E8D5D5',
-                            cursor: 'pointer',
-                            background: !selectedCategory ? '#A65B5B' : '#FFF5F5', 
-                            color: !selectedCategory ? '#ffffff' : '#4A3C3C',
+                            border: !selectedCategory ? '1px solid #A35858' : '1px solid #F0E3E3',
+                            background: !selectedCategory ? '#A35858' : '#FAF2F2', 
+                            color: !selectedCategory ? '#ffffff' : '#625353',
                             fontWeight: !selectedCategory ? 600 : 500,
-                            transition: 'all 0.2s'
                         }}
                     >
                         ✨ Todas
@@ -196,16 +326,12 @@ function CatalogPage() {
                         <button
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
+                            className="category-pill"
                             style={{ 
-                                padding: '0.5rem 1.1rem', 
-                                fontSize: '0.88rem', 
-                                borderRadius: '20px',
-                                border: selectedCategory === cat ? '1px solid #A65B5B' : '1px solid #E8D5D5',
-                                cursor: 'pointer',
-                                background: selectedCategory === cat ? '#A65B5B' : '#FFF5F5', 
-                                color: selectedCategory === cat ? '#ffffff' : '#4A3C3C',
+                                border: selectedCategory === cat ? '1px solid #A35858' : '1px solid #F0E3E3',
+                                background: selectedCategory === cat ? '#A35858' : '#FAF2F2', 
+                                color: selectedCategory === cat ? '#ffffff' : '#625353',
                                 fontWeight: selectedCategory === cat ? 600 : 500,
-                                transition: 'all 0.2s'
                             }}
                         >
                             {cat}
@@ -213,21 +339,11 @@ function CatalogPage() {
                     ))}
                 </div>
 
-                <div style={{ height: '1px', background: '#F0E2E2', width: '100%' }}></div>
+                <div style={{ height: '1px', background: '#F0E3E3', width: '100%' }}></div>
 
                 {/* Linha 2: Busca + Ordenação */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        background: '#FFF5F5', 
-                        border: '1px solid #E8D5D5', 
-                        borderRadius: '14px', 
-                        padding: '0.5rem 1rem', 
-                        flex: '1',
-                        minWidth: '260px',
-                        height: '42px' 
-                    }}>
+                <div className="search-sort-row">
+                    <div className="search-box">
                         <span style={{ marginRight: '0.6rem', fontSize: '0.9rem' }}>🔍</span>
                         <input 
                             type="text" 
@@ -238,9 +354,8 @@ function CatalogPage() {
                                 border: 'none',
                                 background: 'transparent',
                                 outline: 'none',
-                                boxShadow: 'none',
                                 fontSize: '0.9rem',
-                                color: '#2A1B1B',
+                                color: '#2D2323',
                                 width: '100%'
                             }}
                         />
@@ -250,18 +365,7 @@ function CatalogPage() {
                         <select 
                             value={sortBy} 
                             onChange={(e) => setSortBy(e.target.value as SortOption)}
-                            style={{
-                                background: '#FFF5F5',
-                                border: '1px solid #E8D5D5',
-                                padding: '0.5rem 1rem',
-                                borderRadius: '14px',
-                                fontSize: '0.9rem',
-                                color: '#2A1B1B',
-                                fontWeight: 500,
-                                outline: 'none',
-                                cursor: 'pointer',
-                                height: '42px'
-                            }}
+                            className="sort-select"
                         >
                             <option value="recent">Mais Recentes</option>
                             <option value="price-asc">Menor Preço</option>
@@ -273,17 +377,17 @@ function CatalogPage() {
 
             {/* Contador de Produtos */}
             <div style={{ paddingLeft: '0.2rem', marginBottom: '1.5rem' }}>
-                <span style={{ color: '#4A3C3C', fontSize: '0.9rem', fontWeight: 600 }}>
+                <span style={{ color: '#625353', fontSize: '0.9rem', fontWeight: 600 }}>
                     {filteredProducts.length} produto(s) encontrado(s)
                 </span>
             </div>
 
             {/* Grid de Produtos */}
-            <div className="grid products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
+            <div className="catalog-grid">
                 {filteredProducts.length > 0 ? (
                     filteredProducts.map((product) => <ProductCard key={product.id} product={product} />)
                 ) : (
-                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem 0', color: '#4A3C3C' }}>
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem 0', color: '#625353' }}>
                         <p style={{ fontSize: '1.1rem', fontWeight: 500 }}>Nenhum produto encontrado com esses critérios.</p>
                     </div>
                 )}
@@ -297,56 +401,65 @@ function CatalogPage() {
             >
                 <form onSubmit={handleSendToWhatsApp} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '1rem' }}>
                     <div>
-                        <label style={{ display: 'block', fontSize: '0.88rem', color: '#2A1B1B', fontWeight: 600, marginBottom: '0.4rem' }}>Tema / Estampa desejada *</label>
+                        <label style={{ display: 'block', fontSize: '0.88rem', color: '#2D2323', fontWeight: 600, marginBottom: '0.4rem' }}>
+                            Tema / Estampa desejada *
+                        </label>
                         <input 
                             type="text" 
                             required
                             placeholder="Ex: Ursinho marinheiro, Floral rosa..." 
                             value={customData.tema}
                             onChange={(e) => setCustomData({...customData, tema: e.target.value})}
-                            style={{ width: '100%', padding: '0.7rem', borderRadius: '10px', border: '1px solid #E8D5D5', outline: 'none', fontSize: '0.92rem', color: '#2A1B1B' }}
+                            className="form-input"
                         />
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '0.88rem', color: '#2A1B1B', fontWeight: 600, marginBottom: '0.4rem' }}>Tamanho / Medidas *</label>
+                        <label style={{ display: 'block', fontSize: '0.88rem', color: '#2D2323', fontWeight: 600, marginBottom: '0.4rem' }}>
+                            Tamanho / Medidas *
+                        </label>
                         <input 
                             type="text" 
                             required
                             placeholder="Ex: Berço americano, Toalha banho 70x140cm..." 
                             value={customData.tamanho}
                             onChange={(e) => setCustomData({...customData, tamanho: e.target.value})}
-                            style={{ width: '100%', padding: '0.7rem', borderRadius: '10px', border: '1px solid #E8D5D5', outline: 'none', fontSize: '0.92rem', color: '#2A1B1B' }}
+                            className="form-input"
                         />
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '0.88rem', color: '#2A1B1B', fontWeight: 600, marginBottom: '0.4rem' }}>Cor Predominante / Paleta *</label>
+                        <label style={{ display: 'block', fontSize: '0.88rem', color: '#2D2323', fontWeight: 600, marginBottom: '0.4rem' }}>
+                            Cor Predominante / Paleta *
+                        </label>
                         <input 
                             type="text" 
                             required
                             placeholder="Ex: Azul marinho e dourado, Rosa bebê..." 
                             value={customData.cor}
                             onChange={(e) => setCustomData({...customData, cor: e.target.value})}
-                            style={{ width: '100%', padding: '0.7rem', borderRadius: '10px', border: '1px solid #E8D5D5', outline: 'none', fontSize: '0.92rem', color: '#2A1B1B' }}
+                            className="form-input"
                         />
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '0.88rem', color: '#2A1B1B', fontWeight: 600, marginBottom: '0.4rem' }}>Observações adicionais</label>
+                        <label style={{ display: 'block', fontSize: '0.88rem', color: '#2D2323', fontWeight: 600, marginBottom: '0.4rem' }}>
+                            Observações adicionais
+                        </label>
                         <textarea 
                             rows={3}
                             placeholder="Algum detalhe extra, nome do bebê a ser bordado, etc." 
                             value={customData.observacoes}
                             onChange={(e) => setCustomData({...customData, observacoes: e.target.value})}
-                            style={{ width: '100%', padding: '0.7rem', borderRadius: '10px', border: '1px solid #E8D5D5', outline: 'none', fontSize: '0.92rem', color: '#2A1B1B', resize: 'vertical' }}
+                            className="form-textarea"
+                            style={{ resize: 'vertical' }}
                         />
                     </div>
 
                     <button 
                         type="submit"
                         style={{
-                            background: '#A65B5B',
+                            background: '#A35858',
                             color: '#ffffff',
                             border: 'none',
                             padding: '0.95rem',
@@ -359,9 +472,11 @@ function CatalogPage() {
                             justifyContent: 'center',
                             gap: '0.5rem',
                             fontSize: '0.98rem',
-                            boxShadow: '0 4px 12px rgba(166, 91, 91, 0.2)',
+                            boxShadow: '0 4px 14px rgba(163, 88, 88, 0.22)',
                             transition: 'background 0.2s'
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#8e4b4b'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#A35858'}
                     >
                         💬 Enviar Orçamento no WhatsApp
                     </button>
