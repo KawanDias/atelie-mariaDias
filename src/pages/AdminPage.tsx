@@ -5,6 +5,50 @@ import type { Product, ProductCategory } from '../types';
 import { productService } from '../services/productService';
 import { mockProducts } from '../data/products';
 
+// Categorias centralizadas (certifique-se que coincidem com seu types.ts)
+const CATEGORIES: ProductCategory[] = [
+    'Enxoval de Bebê',
+    'Batizado',
+    'Toalhas Personalizadas',
+    'Acessórios & Maternidade',
+    'Decoração do Quartinho',
+];
+
+// Processamento assíncrono de imagens via Canvas
+const processImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Erro ao ler o arquivo de imagem'));
+        reader.onloadend = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Erro ao carregar a imagem no Canvas'));
+            img.src = reader.result as string;
+
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height = Math.round((height * MAX_WIDTH) / width);
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                resolve(compressedBase64);
+            };
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
 function AdminPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [isEditing, setIsEditing] = useState<number | string | null>(null);
@@ -17,7 +61,7 @@ function AdminPage() {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
-        category: 'Enxoval de Bebê' as ProductCategory,
+        category: CATEGORIES[0],
         price: '',
         measurements: '',
         images: [] as string[],
@@ -41,50 +85,26 @@ function AdminPage() {
         setProducts(data);
     };
 
-    // Upload de imagem com redimensionamento e compressão em Canvas
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
 
         if (formData.images.length + files.length > 4) {
             toast.error('Você só pode adicionar no máximo 4 fotos por produto.');
             return;
         }
 
-        files.forEach((file) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const img = new Image();
-                img.src = reader.result as string;
-
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > MAX_WIDTH) {
-                        height = Math.round((height * MAX_WIDTH) / width);
-                        width = MAX_WIDTH;
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-
-                    const ctx = canvas.getContext('2d');
-                    ctx?.drawImage(img, 0, 0, width, height);
-
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-
-                    setFormData((prev) => ({
-                        ...prev,
-                        images: [...prev.images, compressedBase64].slice(0, 4),
-                    }));
-                };
-            };
-            reader.readAsDataURL(file);
-        });
-
-        e.target.value = '';
+        try {
+            const compressedImages = await Promise.all(files.map(processImageFile));
+            setFormData((prev) => ({
+                ...prev,
+                images: [...prev.images, ...compressedImages].slice(0, 4),
+            }));
+        } catch (error) {
+            toast.error('Ocorreu um erro ao processar uma ou mais imagens.');
+        } finally {
+            e.target.value = '';
+        }
     };
 
     const removeImage = (indexToRemove: number) => {
@@ -96,9 +116,9 @@ function AdminPage() {
 
     const handleEdit = (product: Product) => {
         setIsEditing(product.id);
-        const existingImages = (product as any).images 
-            ? (product as any).images 
-            : ((product as any).image ? [(product as any).image] : []);
+        const existingImages = product.images && product.images.length > 0 
+            ? product.images 
+            : (product.image ? [product.image] : []);
 
         setFormData({
             title: product.title,
@@ -110,7 +130,6 @@ function AdminPage() {
             featured: product.featured || false,
         });
 
-        // Rola suavemente até o formulário de edição
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -119,7 +138,7 @@ function AdminPage() {
         setFormData({
             title: '',
             description: '',
-            category: 'Enxoval de Bebê',
+            category: CATEGORIES[0],
             price: '',
             measurements: '',
             images: [],
@@ -172,7 +191,6 @@ function AdminPage() {
         }
     };
 
-    // Lógica de filtragem dos produtos
     const filteredProducts = products.filter((product) => {
         const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                               product.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -180,12 +198,13 @@ function AdminPage() {
         return matchesSearch && matchesCategory;
     });
 
+    // ESTILOS COM ALTO CONTRASTE
     const cardStyle = { 
         background: '#ffffff', 
         padding: '2rem', 
         borderRadius: '24px', 
-        border: '1px solid #f2e6e6',
-        boxShadow: '0 4px 20px rgba(230, 200, 200, 0.12)', 
+        border: '1px solid #dec3c3',
+        boxShadow: '0 4px 20px rgba(180, 140, 140, 0.12)', 
         marginBottom: '2rem' 
     };
 
@@ -193,31 +212,32 @@ function AdminPage() {
         width: '100%', 
         padding: '0.75rem 1rem', 
         borderRadius: '12px', 
-        border: '1px solid #e8dada',
-        backgroundColor: '#faf6f6',
+        border: '1.5px solid #d4b2b2',
+        backgroundColor: '#fdfbfb',
         outline: 'none',
         fontSize: '0.95rem',
-        color: '#5e4e4e',
+        color: '#2d2222',
+        fontWeight: 400,
         boxSizing: 'border-box' as const
     };
 
     const labelStyle = { 
         display: 'block', 
-        fontSize: '0.85rem', 
-        fontWeight: 500, 
+        fontSize: '0.88rem', 
+        fontWeight: 600, 
         marginBottom: '0.4rem', 
-        color: '#8c7373' 
+        color: '#4a3838' 
     };
 
     return (
-        <div style={{ padding: '3rem 1rem', maxWidth: '850px', margin: '0 auto', color: '#5e4e4e', position: 'relative' }}>
-            <h1 style={{ textAlign: 'center', color: '#b58b8b', marginBottom: '2.5rem', fontWeight: 400, fontSize: '1.8rem' }}>
+        <div style={{ padding: '3rem 1rem', maxWidth: '850px', margin: '0 auto', color: '#2d2222', position: 'relative' }}>
+            <h1 style={{ textAlign: 'center', color: '#7a4e4e', marginBottom: '2.5rem', fontWeight: 600, fontSize: '1.9rem' }}>
                 Painel do Administrador
             </h1>
 
             {/* Formulário de Cadastro / Edição */}
             <div style={cardStyle}>
-                <h2 style={{ fontSize: '1.3rem', marginBottom: '1.5rem', color: '#b58b8b', fontWeight: 400 }}>
+                <h2 style={{ fontSize: '1.35rem', marginBottom: '1.5rem', color: '#7a4e4e', fontWeight: 600 }}>
                     {isEditing !== null ? 'Editar Produto' : 'Cadastrar Novo Produto'}
                 </h2>
 
@@ -241,11 +261,9 @@ function AdminPage() {
                                 onChange={(e) => setFormData({ ...formData, category: e.target.value as ProductCategory })}
                                 style={inputStyle}
                             >
-                                <option value="Enxoval de Bebê">Enxoval de Bebê</option>
-                                <option value="Batizado">Batizado</option>
-                                <option value="Toalhas Personalizadas">Toalhas Personalizadas</option>
-                                <option value="Acessórios & Maternidade">Acessórios & Maternidade</option>
-                                <option value="Decoração do Quartinho">Decoração do Quartinho</option>
+                                {CATEGORIES.map((cat) => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
                             </select>
                         </div>
 
@@ -279,7 +297,7 @@ function AdminPage() {
                             accept="image/*" 
                             multiple 
                             onChange={handleImageUpload} 
-                            style={{ marginBottom: '0.8rem', fontSize: '0.9rem' }}
+                            style={{ marginBottom: '0.8rem', fontSize: '0.9rem', color: '#4a3838' }}
                         />
 
                         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -291,7 +309,7 @@ function AdminPage() {
                                             <img 
                                                 src={imgUrl} 
                                                 alt="Preview" 
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px', border: '1px solid #e8dada' }} 
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px', border: '1px solid #d4b2b2' }} 
                                             />
                                         ) : (
                                             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf6f6', borderRadius: '12px', fontSize: '1.5rem' }}>
@@ -305,7 +323,7 @@ function AdminPage() {
                                                 position: 'absolute', 
                                                 top: '-6px', 
                                                 right: '-6px', 
-                                                background: '#d98282', 
+                                                background: '#a81c1c', 
                                                 color: '#fff', 
                                                 border: 'none', 
                                                 borderRadius: '50%', 
@@ -316,7 +334,7 @@ function AdminPage() {
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                                             }}
                                         >
                                             ✕
@@ -353,9 +371,9 @@ function AdminPage() {
                                 }
                                 setFormData({ ...formData, featured: e.target.checked });
                             }} 
-                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#b58b8b' }}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#8c5050' }}
                         />
-                        <label htmlFor="featured" style={{ fontSize: '0.9rem', cursor: 'pointer', color: '#7a6666', userSelect: 'none' }}>
+                        <label htmlFor="featured" style={{ fontSize: '0.92rem', cursor: 'pointer', color: '#4a3838', fontWeight: 500, userSelect: 'none' }}>
                             Destaque na página inicial (Máx. 4)
                         </label>
                     </div>
@@ -364,14 +382,16 @@ function AdminPage() {
                         <button 
                             type="submit" 
                             style={{ 
-                                background: '#b58b8b', 
-                                color: 'white', 
+                                background: '#8c5050', 
+                                color: '#ffffff', 
                                 border: 'none', 
-                                padding: '0.8rem 1.5rem', 
+                                padding: '0.85rem 1.8rem', 
                                 borderRadius: '12px', 
-                                fontWeight: 500, 
+                                fontWeight: 600, 
+                                fontSize: '0.95rem',
                                 cursor: 'pointer',
-                                transition: 'opacity 0.2s'
+                                boxShadow: '0 4px 12px rgba(140, 80, 80, 0.25)',
+                                transition: 'background 0.2s'
                             }}
                         >
                             {isEditing !== null ? 'Salvar Alterações' : 'Cadastrar Produto'}
@@ -380,7 +400,7 @@ function AdminPage() {
                             <button 
                                 type="button" 
                                 onClick={handleCancel} 
-                                style={{ background: '#f0e6e6', color: '#7a6666', border: 'none', padding: '0.8rem 1.5rem', borderRadius: '12px', cursor: 'pointer', fontWeight: 500 }}
+                                style={{ background: '#ede0e0', color: '#4a3838', border: '1px solid #d4b2b2', padding: '0.85rem 1.8rem', borderRadius: '12px', cursor: 'pointer', fontWeight: 600 }}
                             >
                                 Cancelar
                             </button>
@@ -391,7 +411,7 @@ function AdminPage() {
 
             {/* Cabeçalho de Produtos Cadastrados */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-                <h2 style={{ fontSize: '1.2rem', color: '#b58b8b', fontWeight: 400, margin: 0 }}>
+                <h2 style={{ fontSize: '1.3rem', color: '#7a4e4e', fontWeight: 600, margin: 0 }}>
                     Produtos Cadastrados ({filteredProducts.length} de {products.length})
                 </h2>
             </div>
@@ -405,8 +425,8 @@ function AdminPage() {
                 background: '#ffffff',
                 padding: '1.2rem',
                 borderRadius: '16px',
-                border: '1px solid #f2e6e6',
-                boxShadow: '0 2px 8px rgba(230, 200, 200, 0.08)'
+                border: '1px solid #dec3c3',
+                boxShadow: '0 2px 8px rgba(180, 140, 140, 0.1)'
             }}>
                 <div>
                     <label style={labelStyle}>🔍 Buscar produto</label>
@@ -427,11 +447,9 @@ function AdminPage() {
                         style={inputStyle}
                     >
                         <option value="Todas">Todas as Categorias</option>
-                        <option value="Enxoval de Bebê">Enxoval de Bebê</option>
-                        <option value="Batizado">Batizado</option>
-                        <option value="Toalhas Personalizadas">Toalhas Personalizadas</option>
-                        <option value="Acessórios & Maternidade">Acessórios & Maternidade</option>
-                        <option value="Decoração do Quartinho">Decoração do Quartinho</option>
+                        {CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
                     </select>
                 </div>
             </div>
@@ -440,7 +458,9 @@ function AdminPage() {
             <div style={{ display: 'grid', gap: '0.8rem' }}>
                 {filteredProducts.length > 0 ? (
                     filteredProducts.map((product) => {
-                        const productImages = (product as any).images || ((product as any).image ? [(product as any).image] : []);
+                        const productImages = product.images && product.images.length > 0 
+                            ? product.images 
+                            : (product.image ? [product.image] : []);
                         const mainImage = productImages[0] || '';
                         const isUrl = mainImage.startsWith('http') || mainImage.startsWith('data:');
 
@@ -452,8 +472,8 @@ function AdminPage() {
                                 background: '#fff', 
                                 padding: '1rem 1.2rem', 
                                 borderRadius: '16px', 
-                                border: '1px solid #f2e6e6',
-                                boxShadow: '0 2px 8px rgba(230, 200, 200, 0.08)'
+                                border: '1px solid #dec3c3',
+                                boxShadow: '0 2px 8px rgba(180, 140, 140, 0.08)'
                             }}>
                                 <Link 
                                     to={`/produto/${product.id}`} 
@@ -463,33 +483,51 @@ function AdminPage() {
                                         <img 
                                             src={mainImage} 
                                             alt={product.title} 
-                                            style={{ width: '55px', height: '55px', objectFit: 'cover', borderRadius: '10px' }} 
+                                            style={{ width: '58px', height: '58px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e8d8d8' }} 
                                         />
                                     ) : (
-                                        <div style={{ width: '55px', height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf6f6', borderRadius: '10px', fontSize: '1.5rem' }}>
+                                        <div style={{ width: '58px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf6f6', borderRadius: '10px', fontSize: '1.5rem', border: '1px solid #e8d8d8' }}>
                                             {mainImage || '🖼️'}
                                         </div>
                                     )}
                                     <div>
-                                        <strong style={{ display: 'block', color: '#5e4e4e', fontSize: '0.95rem' }}>
+                                        <strong style={{ display: 'block', color: '#2d2222', fontSize: '0.98rem', fontWeight: 600 }}>
                                             {product.title} {product.featured && '⭐'}
                                         </strong>
-                                        <span style={{ fontSize: '0.8rem', color: '#a38f8f' }}>
-                                            {product.category} • {product.price} {product.measurements && `• Medidas: ${product.measurements}`}
+                                        <span style={{ fontSize: '0.85rem', color: '#524343', fontWeight: 500 }}>
+                                            {product.category} • <span style={{ color: '#8c5050', fontWeight: 600 }}>{product.price}</span> {product.measurements && `• Medidas: ${product.measurements}`}
                                         </span>
                                     </div>
                                 </Link>
 
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', gap: '0.6rem' }}>
                                     <button 
                                         onClick={() => handleEdit(product)} 
-                                        style={{ background: '#f7eded', border: 'none', padding: '0.5rem 1rem', borderRadius: '10px', cursor: 'pointer', color: '#b58b8b', fontWeight: 500, fontSize: '0.85rem' }}
+                                        style={{ 
+                                            background: '#f2e1e1', 
+                                            border: '1px solid #d9c1c1', 
+                                            padding: '0.55rem 1.1rem', 
+                                            borderRadius: '10px', 
+                                            cursor: 'pointer', 
+                                            color: '#6e3838', 
+                                            fontWeight: 600, 
+                                            fontSize: '0.85rem' 
+                                        }}
                                     >
                                         ✏️ Editar
                                     </button>
                                     <button 
                                         onClick={() => setItemToDelete({ id: product.id, title: product.title })} 
-                                        style={{ background: '#fce8e8', color: '#d98282', border: 'none', padding: '0.5rem 1rem', borderRadius: '10px', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
+                                        style={{ 
+                                            background: '#fbe3e3', 
+                                            color: '#a81c1c', 
+                                            border: '1px solid #f3b8b8', 
+                                            padding: '0.55rem 1.1rem', 
+                                            borderRadius: '10px', 
+                                            cursor: 'pointer', 
+                                            fontWeight: 600, 
+                                            fontSize: '0.85rem' 
+                                        }}
                                     >
                                         🗑️ Excluir
                                     </button>
@@ -503,8 +541,9 @@ function AdminPage() {
                         padding: '2.5rem 1rem', 
                         background: '#ffffff', 
                         borderRadius: '16px', 
-                        border: '1px dashed #e8dada',
-                        color: '#a38f8f' 
+                        border: '1px dashed #d4b2b2',
+                        color: '#524343',
+                        fontWeight: 500
                     }}>
                         Nenhum produto encontrado com os filtros aplicados.
                     </div>
@@ -519,7 +558,7 @@ function AdminPage() {
                     left: 0,
                     width: '100vw',
                     height: '100vh',
-                    background: 'rgba(94, 78, 78, 0.4)',
+                    background: 'rgba(45, 34, 34, 0.5)',
                     backdropFilter: 'blur(4px)',
                     display: 'flex',
                     alignItems: 'center',
@@ -531,18 +570,18 @@ function AdminPage() {
                         background: '#ffffff',
                         padding: '2rem',
                         borderRadius: '24px',
-                        border: '1px solid #f2e6e6',
-                        boxShadow: '0 10px 30px rgba(230, 200, 200, 0.25)',
+                        border: '1px solid #dec3c3',
+                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
                         maxWidth: '400px',
                         width: '100%',
                         textAlign: 'center'
                     }}>
                         <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⚠️</div>
-                        <h3 style={{ fontSize: '1.2rem', color: '#5e4e4e', fontWeight: 500, marginBottom: '0.6rem' }}>
+                        <h3 style={{ fontSize: '1.25rem', color: '#2d2222', fontWeight: 600, marginBottom: '0.6rem' }}>
                             Excluir peça?
                         </h3>
-                        <p style={{ fontSize: '0.9rem', color: '#8c7373', lineHeight: '1.5', marginBottom: '1.5rem' }}>
-                            Tem certeza de que deseja remover o produto <strong style={{ color: '#5e4e4e' }}>"{itemToDelete.title}"</strong>? Esta ação não poderá ser desfeita.
+                        <p style={{ fontSize: '0.92rem', color: '#524343', lineHeight: '1.5', marginBottom: '1.5rem' }}>
+                            Tem certeza de que deseja remover o produto <strong style={{ color: '#2d2222' }}>"{itemToDelete.title}"</strong>? Esta ação não poderá ser desfeita.
                         </p>
                         <div style={{ display: 'flex', gap: '0.8rem' }}>
                             <button
@@ -550,12 +589,12 @@ function AdminPage() {
                                 style={{
                                     flex: 1,
                                     background: '#faf6f6',
-                                    color: '#7a6666',
-                                    border: '1px solid #e8dada',
-                                    padding: '0.7rem',
+                                    color: '#4a3838',
+                                    border: '1px solid #d4b2b2',
+                                    padding: '0.75rem',
                                     borderRadius: '12px',
-                                    fontSize: '0.85rem',
-                                    fontWeight: 500,
+                                    fontSize: '0.9rem',
+                                    fontWeight: 600,
                                     cursor: 'pointer'
                                 }}
                             >
@@ -565,15 +604,15 @@ function AdminPage() {
                                 onClick={confirmDelete}
                                 style={{
                                     flex: 1,
-                                    background: '#d98282',
+                                    background: '#a81c1c',
                                     color: '#ffffff',
                                     border: 'none',
-                                    padding: '0.7rem',
+                                    padding: '0.75rem',
                                     borderRadius: '12px',
-                                    fontSize: '0.85rem',
-                                    fontWeight: 500,
+                                    fontSize: '0.9rem',
+                                    fontWeight: 600,
                                     cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(217, 130, 130, 0.3)'
+                                    boxShadow: '0 4px 12px rgba(168, 28, 28, 0.3)'
                                 }}
                             >
                                 Sim, excluir

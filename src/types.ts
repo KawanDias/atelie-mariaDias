@@ -1,4 +1,9 @@
-export type ProductCategory = 'Enxoval de Bebê' | 'Batizado' | 'Acessórios & Maternidade' | 'Decoração do Quartinho';
+export type ProductCategory = 
+    | 'Enxoval de Bebê' 
+    | 'Batizado' 
+    | 'Toalhas Personalizadas' 
+    | 'Acessórios & Maternidade' 
+    | 'Decoração do Quartinho';
 
 export interface Product {
     id: number;
@@ -9,5 +14,5 @@ export interface Product {
     images: string[]; 
     image?: string; 
     featured?: boolean;
-    measurements?: string; // <-- Novo campo opcional para as medidas da peça
+    measurements?: string;
 }

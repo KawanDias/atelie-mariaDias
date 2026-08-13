@@ -47,7 +47,22 @@ export function Footer() {
                     <span style={{ color: '#d9c2c2' }}>|</span>
 
                     <span style={{ color: '#a38f8f' }}>
-                        Desenvolvido por <strong style={{ color: '#5e4e4e', fontWeight: 600 }}>Kawan Dias</strong>
+                        Desenvolvido por{' '}
+                        <a 
+                            href="https://www.linkedin.com/in/kawdev" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ 
+                                color: '#5e4e4e', 
+                                fontWeight: 600, 
+                                textDecoration: 'none',
+                                transition: 'color 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = '#A65B5B')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = '#5e4e4e')}
+                        >
+                            Kawan Dias
+                        </a>
                     </span>
                 </div>
             </div>

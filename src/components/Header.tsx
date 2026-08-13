@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useFavorites } from '../contexts/FavoritesContext';
@@ -16,6 +16,7 @@ function Header() {
     const { user, logout } = useAuth();
     const { favorites } = useFavorites();
     const [searchTerm, setSearchTerm] = useState('');
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const navigate = useNavigate();
 
     // Verifica se o usuário logado é admin (por role ou por e-mail)
@@ -28,46 +29,163 @@ function Header() {
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        // Redireciona para o catálogo levando o termo de busca na URL
         if (searchTerm.trim()) {
             navigate(`/catalogo?busca=${encodeURIComponent(searchTerm)}`);
+            setIsMenuOpen(false); // Fecha o menu no mobile ao buscar
         }
     };
 
+    const closeMenu = () => setIsMenuOpen(false);
+
     return (
-        <header className="topbar" style={{ background: '#fff', borderBottom: '1px solid #f2e6e6' }}>
-            <div className="promo-bar" style={{ fontSize: '0.8rem', padding: '0.3rem 0', background: '#fcf8f8', color: '#8c7373', textAlign: 'center' }}>
+        <header className="topbar">
+            {/* Estilos CSS Responsivos Embutidos */}
+            <style>{`
+                .topbar {
+                    background: #ffffff;
+                    border-bottom: 1px solid #E8D5D5;
+                    width: 100%;
+                }
+
+                .promo-bar {
+                    font-size: 0.8rem;
+                    padding: 0.4rem 1rem;
+                    background: #F8ECE8;
+                    color: #4A3C3C;
+                    text-align: center;
+                    font-weight: 600;
+                    letter-spacing: 0.01em;
+                }
+
+                .header-main {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    padding: 0.75rem 1.25rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 1rem;
+                }
+
+                .logo-img {
+                    height: 80px;
+                    width: auto;
+                    object-fit: contain;
+                    transition: height 0.3s ease;
+                }
+
+                .search-form {
+                    flex: 1;
+                    max-width: 420px;
+                    display: flex;
+                    align-items: center;
+                    background: #FFF5F5;
+                    border: 1px solid #E8D5D5;
+                    border-radius: 25px;
+                    padding: 0.4rem 1rem;
+                    box-shadow: 0 2px 6px rgba(80, 50, 50, 0.04);
+                }
+
+                .user-actions-desktop {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    flex-shrink: 0;
+                }
+
+                .nav-desktop {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    padding: 0.2rem 1.5rem 0.85rem 1.5rem;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+
+                .mobile-right-actions {
+                    display: none;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .menu-toggle-btn {
+                    background: transparent;
+                    border: none;
+                    font-size: 1.5rem;
+                    cursor: pointer;
+                    color: #4A3C3C;
+                    padding: 0.3rem 0.5rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .mobile-drawer {
+                    display: none;
+                    background: #ffffff;
+                    border-top: 1px solid #E8D5D5;
+                    padding: 1.25rem 1.5rem;
+                    flex-direction: column;
+                    gap: 1.25rem;
+                    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+                }
+
+                .mobile-nav-links {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.85rem;
+                }
+
+                .mobile-nav-links a {
+                    text-decoration: none;
+                    font-size: 0.95rem;
+                    padding: 0.4rem 0;
+                    border-bottom: 1px solid #FFF5F5;
+                }
+
+                /* --- MEDIA QUERIES PARA MOBILE (< 768px) --- */
+                @media (max-width: 768px) {
+                    .logo-img {
+                        height: 52px;
+                    }
+
+                    .search-form-desktop,
+                    .user-actions-desktop,
+                    .nav-desktop {
+                        display: none !important;
+                    }
+
+                    .mobile-right-actions {
+                        display: flex;
+                    }
+
+                    .mobile-drawer.open {
+                        display: flex;
+                    }
+                }
+            `}</style>
+
+            {/* Faixa superior de anúncios */}
+            <div className="promo-bar">
                 Bordados Afetuosos & Enxoval de Bebê Personalizado • Envio para todo o Brasil
             </div>
             
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+            {/* Bloco principal do Header */}
+            <div className="header-main">
                 
                 {/* Logo */}
-                <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <Link to="/" onClick={closeMenu} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                     <img 
                         src={logoImg} 
                         alt="Ateliê Maria Dias" 
-                        style={{ height: '100px', width: '100px', objectFit: 'contain' }} 
+                        className="logo-img"
                     />
                 </Link>
 
-                {/* Barra de Pesquisa Funcional */}
-                <form 
-                    onSubmit={handleSearch}
-                    style={{ 
-                        flex: 1, 
-                        maxWidth: '380px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        background: '#fdfbfb', 
-                        border: '1px solid #ebdada', 
-                        borderRadius: '25px', 
-                        padding: '0.35rem 0.9rem',
-                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)'
-                    }}
-                >
-                    <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', marginRight: '0.5rem', opacity: 0.6 }}>
-                        🔎
+                {/* Barra de Pesquisa Desktop */}
+                <form onSubmit={handleSearch} className="search-form search-form-desktop">
+                    <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', marginRight: '0.5rem', opacity: 0.85 }}>
+                        🔍
                     </button>
                     <input 
                         type="text" 
@@ -79,32 +197,36 @@ function Header() {
                             background: 'transparent', 
                             outline: 'none', 
                             width: '100%', 
-                            fontSize: '0.85rem', 
-                            color: '#5e4e4e' 
+                            fontSize: '0.88rem', 
+                            color: '#2A1B1B',
+                            fontWeight: 500
                         }} 
                     />
                 </form>
 
-                {/* Ações do usuário */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
+                {/* Ações do usuário - Desktop */}
+                <div className="user-actions-desktop">
                     {user ? (
                         <>
-                            <span style={{ fontSize: '0.85rem', color: '#b58b8b', fontWeight: 600 }}>
+                            <span style={{ fontSize: '0.88rem', color: '#2A1B1B', fontWeight: 600 }}>
                                 👤 {user.name || 'Usuário'}
                             </span>
 
-                            {/* Botão Admin condicional */}
                             {isAdmin && (
                                 <Link 
                                     to="/admin" 
                                     style={{ 
-                                        background: '#f2e6e6', 
-                                        color: '#8c7373', 
-                                        padding: '0.3rem 0.6rem', 
-                                        borderRadius: '6px', 
-                                        fontWeight: 500,
-                                        fontSize: '0.8rem',
-                                        textDecoration: 'none'
+                                        background: '#FFF5F5', 
+                                        color: '#8C3B3B', 
+                                        border: '1px solid #E8D5D5',
+                                        padding: '0.35rem 0.75rem', 
+                                        borderRadius: '8px', 
+                                        fontWeight: 600,
+                                        fontSize: '0.82rem',
+                                        textDecoration: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem'
                                     }}
                                 >
                                     ⚙️ Admin
@@ -115,11 +237,12 @@ function Header() {
                                 onClick={logout} 
                                 style={{ 
                                     background: 'transparent', 
-                                    border: '1px solid #e8dada',
-                                    padding: '0.3rem 0.6rem', 
-                                    borderRadius: '6px', 
-                                    color: '#8c7373', 
-                                    fontSize: '0.8rem',
+                                    border: '1px solid #E8D5D5',
+                                    padding: '0.35rem 0.75rem', 
+                                    borderRadius: '8px', 
+                                    color: '#4A3C3C', 
+                                    fontSize: '0.82rem',
+                                    fontWeight: 600,
                                     cursor: 'pointer' 
                                 }}
                             >
@@ -127,46 +250,192 @@ function Header() {
                             </button>
                         </>
                     ) : (
-                        <Link to="/login" style={{ background: '#b58b8b', color: 'white', padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, textDecoration: 'none' }}>
+                        <Link to="/login" style={{ 
+                            background: '#8C3B3B', 
+                            color: '#ffffff', 
+                            padding: '0.45rem 1rem', 
+                            borderRadius: '8px', 
+                            fontSize: '0.85rem', 
+                            fontWeight: 600, 
+                            textDecoration: 'none',
+                            boxShadow: '0 4px 10px rgba(140, 59, 59, 0.2)'
+                        }}>
                             Entrar
                         </Link>
                     )}
 
-                    <Link to="/favoritos" style={{ position: 'relative', padding: '0.3rem 0.5rem', textDecoration: 'none', fontSize: '1.1rem' }}>
+                    {/* Botão de Favoritos */}
+                    <Link to="/favoritos" style={{ position: 'relative', padding: '0.4rem', textDecoration: 'none', fontSize: '1.2rem', display: 'flex', alignItems: 'center' }}>
                         ❤️
                         {favorites.length > 0 && (
                             <span style={{
                                 position: 'absolute',
-                                top: '-2px',
+                                top: '0px',
                                 right: '-2px',
-                                background: '#d98282',
-                                color: 'white',
+                                background: '#8C3B3B',
+                                color: '#ffffff',
                                 borderRadius: '50%',
-                                width: '1rem',
-                                height: '1rem',
+                                width: '1.1rem',
+                                height: '1.1rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontSize: '0.65rem',
-                                fontWeight: 'bold',
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                border: '2px solid #ffffff'
                             }}>
                                 {favorites.length}
                             </span>
                         )}
                     </Link>
                 </div>
+
+                {/* Ações Mobile (Favoritos + Botão do Menu Hambúrguer) */}
+                <div className="mobile-right-actions">
+                    <Link to="/favoritos" onClick={closeMenu} style={{ position: 'relative', padding: '0.4rem', textDecoration: 'none', fontSize: '1.3rem', display: 'flex', alignItems: 'center' }}>
+                        ❤️
+                        {favorites.length > 0 && (
+                            <span style={{
+                                position: 'absolute',
+                                top: '0px',
+                                right: '-2px',
+                                background: '#8C3B3B',
+                                color: '#ffffff',
+                                borderRadius: '50%',
+                                width: '1.1rem',
+                                height: '1.1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                border: '2px solid #ffffff'
+                            }}>
+                                {favorites.length}
+                            </span>
+                        )}
+                    </Link>
+
+                    <button 
+                        className="menu-toggle-btn" 
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        aria-label="Abrir Menu"
+                    >
+                        {isMenuOpen ? '✕' : '☰'}
+                    </button>
+                </div>
             </div>
 
-            {/* Barra inferior de categorias e serviços */}
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1.5rem 0.75rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <nav style={{ display: 'flex', gap: '2rem', fontSize: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <Link to="/catalogo" style={{ color: '#b58b8b', fontWeight: 600, textDecoration: 'none' }}>✨ Todos</Link>
-                    <Link to="/catalogo" style={{ color: '#7a6666', textDecoration: 'none' }}>Enxoval de Bebê</Link>
-                    <Link to="/catalogo" style={{ color: '#7a6666', textDecoration: 'none' }}>Batizado</Link>
-                    <Link to="/catalogo" style={{ color: '#7a6666', textDecoration: 'none' }}>Toalhas Personalizadas</Link>
-                    <Link to="/catalogo" style={{ color: '#7a6666', textDecoration: 'none' }}>Acessórios & Maternidade</Link>
-                    <Link to="/catalogo" style={{ color: '#7a6666', textDecoration: 'none' }}>Decoração do Quartinho</Link>
-                    <Link to="/consertos" style={{ color: '#b58b8b', fontWeight: 600, textDecoration: 'none' }}>🪡 Consertos e Ajustes</Link>
+            {/* Menu Mobile Retrátil (Drawer) */}
+            <div className={`mobile-drawer ${isMenuOpen ? 'open' : ''}`}>
+                {/* Busca Mobile */}
+                <form onSubmit={handleSearch} className="search-form" style={{ maxWidth: '100%' }}>
+                    <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', marginRight: '0.5rem', opacity: 0.85 }}>
+                        🔍
+                    </button>
+                    <input 
+                        type="text" 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar no ateliê..." 
+                        style={{ 
+                            border: 'none', 
+                            background: 'transparent', 
+                            outline: 'none', 
+                            width: '100%', 
+                            fontSize: '0.88rem', 
+                            color: '#2A1B1B',
+                            fontWeight: 500
+                        }} 
+                    />
+                </form>
+
+                {/* Status do Usuário / Login Mobile */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid #F8ECE8' }}>
+                    {user ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', width: '100%', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.9rem', color: '#2A1B1B', fontWeight: 600 }}>
+                                👤 {user.name || 'Usuário'}
+                            </span>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                {isAdmin && (
+                                    <Link 
+                                        to="/admin" 
+                                        onClick={closeMenu}
+                                        style={{ 
+                                            background: '#FFF5F5', 
+                                            color: '#8C3B3B', 
+                                            border: '1px solid #E8D5D5',
+                                            padding: '0.35rem 0.65rem', 
+                                            borderRadius: '8px', 
+                                            fontWeight: 600,
+                                            fontSize: '0.8rem',
+                                            textDecoration: 'none'
+                                        }}
+                                    >
+                                        ⚙️ Admin
+                                    </Link>
+                                )}
+                                <button 
+                                    onClick={() => { logout(); closeMenu(); }} 
+                                    style={{ 
+                                        background: 'transparent', 
+                                        border: '1px solid #E8D5D5',
+                                        padding: '0.35rem 0.65rem', 
+                                        borderRadius: '8px', 
+                                        color: '#4A3C3C', 
+                                        fontSize: '0.8rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer' 
+                                    }}
+                                >
+                                    Sair
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <Link 
+                            to="/login" 
+                            onClick={closeMenu}
+                            style={{ 
+                                background: '#8C3B3B', 
+                                color: '#ffffff', 
+                                padding: '0.55rem 1.2rem', 
+                                borderRadius: '8px', 
+                                fontSize: '0.9rem', 
+                                fontWeight: 600, 
+                                textDecoration: 'none',
+                                textAlign: 'center',
+                                width: '100%'
+                            }}
+                        >
+                            Entrar na Conta
+                        </Link>
+                    )}
+                </div>
+
+                {/* Navigation Links Mobile */}
+                <nav className="mobile-nav-links">
+                    <Link to="/catalogo" onClick={closeMenu} style={{ color: '#8C3B3B', fontWeight: 700 }}>✨ Todos os Produtos</Link>
+                    <Link to="/catalogo" onClick={closeMenu} style={{ color: '#4A3C3C', fontWeight: 500 }}>Enxoval de Bebê</Link>
+                    <Link to="/catalogo" onClick={closeMenu} style={{ color: '#4A3C3C', fontWeight: 500 }}>Batizado</Link>
+                    <Link to="/catalogo" onClick={closeMenu} style={{ color: '#4A3C3C', fontWeight: 500 }}>Toalhas Personalizadas</Link>
+                    <Link to="/catalogo" onClick={closeMenu} style={{ color: '#4A3C3C', fontWeight: 500 }}>Acessórios & Maternidade</Link>
+                    <Link to="/catalogo" onClick={closeMenu} style={{ color: '#4A3C3C', fontWeight: 500 }}>Decoração do Quartinho</Link>
+                    <Link to="/consertos" onClick={closeMenu} style={{ color: '#8C3B3B', fontWeight: 700 }}>🪡 Consertos e Ajustes</Link>
+                </nav>
+            </div>
+
+            {/* Barra inferior de categorias e serviços - Desktop */}
+            <div className="nav-desktop">
+                <nav style={{ display: 'flex', gap: '1.8rem', fontSize: '0.88rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <Link to="/catalogo" style={{ color: '#8C3B3B', fontWeight: 700, textDecoration: 'none' }}>✨ Todos</Link>
+                    <Link to="/catalogo" style={{ color: '#4A3C3C', fontWeight: 500, textDecoration: 'none' }}>Enxoval de Bebê</Link>
+                    <Link to="/catalogo" style={{ color: '#4A3C3C', fontWeight: 500, textDecoration: 'none' }}>Batizado</Link>
+                    <Link to="/catalogo" style={{ color: '#4A3C3C', fontWeight: 500, textDecoration: 'none' }}>Toalhas Personalizadas</Link>
+                    <Link to="/catalogo" style={{ color: '#4A3C3C', fontWeight: 500, textDecoration: 'none' }}>Acessórios & Maternidade</Link>
+                    <Link to="/catalogo" style={{ color: '#4A3C3C', fontWeight: 500, textDecoration: 'none' }}>Decoração do Quartinho</Link>
+                    <Link to="/consertos" style={{ color: '#8C3B3B', fontWeight: 700, textDecoration: 'none' }}>🪡 Consertos e Ajustes</Link>
                 </nav>
             </div>
         </header>
