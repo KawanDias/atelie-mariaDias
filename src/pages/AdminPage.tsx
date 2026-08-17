@@ -22,6 +22,24 @@ const INITIAL_FORM = {
     featured: false,
 };
 
+/*
+=====================================================
+CONFIGURAÇÃO DAS IMAGENS
+=====================================================
+*/
+
+const MAX_IMAGES = 4;
+
+// Tamanho máximo aproximado de cada imagem.
+// Mantemos bem abaixo do limite do Firestore.
+const MAX_IMAGE_BYTES = 120 * 1024;
+
+// Dimensão máxima.
+const MAX_WIDTH = 1000;
+
+// Qualidade mínima permitida.
+const MIN_QUALITY = 0.45;
+
 const getProductImages = (product: Product): string[] => {
     if (product.images && product.images.length > 0) {
         return product.images;
@@ -35,53 +53,534 @@ const getProductImages = (product: Product): string[] => {
 };
 
 const isImageUrl = (value: string) =>
-    value.startsWith('http') || value.startsWith('data:');
+    value.startsWith('http') ||
+    value.startsWith('https') ||
+    value.startsWith('data:');
 
-const processImageFile = (file: File): Promise<string> =>
+/*
+=====================================================
+ESTIMAR TAMANHO DO BASE64
+=====================================================
+*/
+
+const getBase64Size = (dataUrl: string): number => {
+    const base64 = dataUrl.split(',')[1] || '';
+
+    return Math.floor(
+        (base64.length * 3) / 4
+    );
+};
+
+/*
+=====================================================
+COMPRIMIR CANVAS
+=====================================================
+*/
+
+const canvasToCompressedDataUrl = (
+    canvas: HTMLCanvasElement,
+    initialQuality = 0.75
+): Promise<string> => {
+    return new Promise(resolve => {
+        let quality = initialQuality;
+        let result = canvas.toDataURL(
+            'image/jpeg',
+            quality
+        );
+
+        /*
+        Tenta reduzir progressivamente a qualidade
+        até atingir o tamanho desejado.
+        */
+
+        while (
+            getBase64Size(result) > MAX_IMAGE_BYTES &&
+            quality > MIN_QUALITY
+        ) {
+            quality -= 0.05;
+
+            result = canvas.toDataURL(
+                'image/jpeg',
+                quality
+            );
+        }
+
+        resolve(result);
+    });
+};
+
+/*
+=====================================================
+PROCESSAR ARQUIVO DE IMAGEM
+=====================================================
+*/
+
+const processImageFile = (
+    file: File
+): Promise<string> =>
     new Promise((resolve, reject) => {
         const reader = new FileReader();
 
         reader.onerror = () => {
-            reject(new Error('Erro ao ler o arquivo de imagem.'));
+            reject(
+                new Error(
+                    'Erro ao ler o arquivo de imagem.'
+                )
+            );
         };
 
         reader.onload = () => {
             const img = new Image();
 
             img.onerror = () => {
-                reject(new Error('Erro ao carregar a imagem.'));
+                reject(
+                    new Error(
+                        'Erro ao carregar a imagem.'
+                    )
+                );
             };
 
-            img.onload = () => {
-                const MAX_WIDTH = 1200;
+            img.onload = async () => {
+                try {
+                    let width =
+                        img.naturalWidth;
 
-                let width = img.naturalWidth;
-                let height = img.naturalHeight;
+                    let height =
+                        img.naturalHeight;
 
-                if (width > MAX_WIDTH) {
-                    height = Math.round(
-                        (height * MAX_WIDTH) / width
+                    /*
+                    Redimensiona inicialmente
+                    */
+
+                    if (width > MAX_WIDTH) {
+                        height = Math.round(
+                            (height *
+                                MAX_WIDTH) /
+                                width
+                        );
+
+                        width = MAX_WIDTH;
+                    }
+
+                    /*
+                    Canvas
+                    */
+
+                    const canvas =
+                        document.createElement(
+                            'canvas'
+                        );
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx =
+                        canvas.getContext(
+                            '2d'
+                        );
+
+                    if (!ctx) {
+                        reject(
+                            new Error(
+                                'Não foi possível criar o Canvas.'
+                            )
+                        );
+
+                        return;
+                    }
+
+                    /*
+                    Fundo branco.
+                    Isso evita problemas com imagens
+                    transparentes convertidas para JPEG.
+                    */
+
+                    ctx.fillStyle =
+                        '#ffffff';
+
+                    ctx.fillRect(
+                        0,
+                        0,
+                        width,
+                        height
                     );
 
-                    width = MAX_WIDTH;
+                    /*
+                    Desenha imagem
+                    */
+
+                    ctx.drawImage(
+                        img,
+                        0,
+                        0,
+                        width,
+                        height
+                    );
+
+                    /*
+                    =============================================
+                    MARCA D'ÁGUA
+                    =============================================
+                    */
+
+                    const fontSize =
+                        Math.max(
+                            18,
+                            Math.round(
+                                width *
+                                    0.028
+                            )
+                        );
+
+                    const diagonal =
+                        Math.sqrt(
+                            width ** 2 +
+                                height ** 2
+                        );
+
+                    ctx.save();
+
+                    ctx.globalAlpha = 0.055;
+
+                    ctx.font = `700 ${fontSize}px Arial, sans-serif`;
+
+                    ctx.fillStyle =
+                        '#ffffff';
+
+                    ctx.textAlign =
+                        'center';
+
+                    ctx.textBaseline =
+                        'middle';
+
+                    ctx.shadowColor =
+                        'rgba(0,0,0,.25)';
+
+                    ctx.shadowBlur = 2;
+
+                    ctx.translate(
+                        width / 2,
+                        height / 2
+                    );
+
+                    ctx.rotate(
+                        -Math.PI / 6
+                    );
+
+                    for (
+                        let y = -diagonal;
+                        y <= diagonal;
+                        y +=
+                            fontSize * 4
+                    ) {
+                        for (
+                            let x = -diagonal;
+                            x <= diagonal;
+                            x +=
+                                fontSize * 8
+                        ) {
+                            ctx.fillText(
+                                'ateliemariadias',
+                                x,
+                                y
+                            );
+                        }
+                    }
+
+                    ctx.restore();
+
+                    /*
+                    =============================================
+                    COMPRESSÃO
+                    =============================================
+                    */
+
+                    let compressed =
+                        await canvasToCompressedDataUrl(
+                            canvas,
+                            0.75
+                        );
+
+                    /*
+                    Se mesmo com qualidade mínima
+                    ainda estiver grande, reduz
+                    fisicamente a resolução.
+                    */
+
+                    let attempts = 0;
+
+                    while (
+                        getBase64Size(
+                            compressed
+                        ) >
+                            MAX_IMAGE_BYTES &&
+                        attempts < 3
+                    ) {
+                        attempts++;
+
+                        width = Math.round(
+                            width * 0.8
+                        );
+
+                        height = Math.round(
+                            height * 0.8
+                        );
+
+                        canvas.width =
+                            width;
+
+                        canvas.height =
+                            height;
+
+                        ctx.clearRect(
+                            0,
+                            0,
+                            width,
+                            height
+                        );
+
+                        ctx.fillStyle =
+                            '#ffffff';
+
+                        ctx.fillRect(
+                            0,
+                            0,
+                            width,
+                            height
+                        );
+
+                        ctx.drawImage(
+                            img,
+                            0,
+                            0,
+                            width,
+                            height
+                        );
+
+                        /*
+                        Reaplica marca d'água
+                        */
+
+                        const newFontSize =
+                            Math.max(
+                                16,
+                                Math.round(
+                                    width *
+                                        0.028
+                                )
+                            );
+
+                        const newDiagonal =
+                            Math.sqrt(
+                                width ** 2 +
+                                    height ** 2
+                            );
+
+                        ctx.save();
+
+                        ctx.globalAlpha =
+                            0.055;
+
+                        ctx.font = `700 ${newFontSize}px Arial, sans-serif`;
+
+                        ctx.fillStyle =
+                            '#ffffff';
+
+                        ctx.textAlign =
+                            'center';
+
+                        ctx.textBaseline =
+                            'middle';
+
+                        ctx.shadowColor =
+                            'rgba(0,0,0,.25)';
+
+                        ctx.shadowBlur = 2;
+
+                        ctx.translate(
+                            width / 2,
+                            height / 2
+                        );
+
+                        ctx.rotate(
+                            -Math.PI / 6
+                        );
+
+                        for (
+                            let y =
+                                -newDiagonal;
+                            y <=
+                            newDiagonal;
+                            y +=
+                                newFontSize *
+                                4
+                        ) {
+                            for (
+                                let x =
+                                    -newDiagonal;
+                                x <=
+                                newDiagonal;
+                                x +=
+                                    newFontSize *
+                                    8
+                            ) {
+                                ctx.fillText(
+                                    'ateliemariadias',
+                                    x,
+                                    y
+                                );
+                            }
+                        }
+
+                        ctx.restore();
+
+                        compressed =
+                            await canvasToCompressedDataUrl(
+                                canvas,
+                                0.65
+                            );
+                    }
+
+                    /*
+                    Segurança final
+                    */
+
+                    if (
+                        getBase64Size(
+                            compressed
+                        ) >
+                        MAX_IMAGE_BYTES
+                    ) {
+                        reject(
+                            new Error(
+                                'Não foi possível comprimir a imagem o suficiente.'
+                            )
+                        );
+
+                        return;
+                    }
+
+                    console.log(
+                        'Imagem processada:',
+                        Math.round(
+                            getBase64Size(
+                                compressed
+                            ) / 1024
+                        ),
+                        'KB'
+                    );
+
+                    resolve(compressed);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+
+            img.src =
+                reader.result as string;
+        };
+
+        reader.readAsDataURL(file);
+    });
+
+/*
+=====================================================
+RECOMPRIMIR DATA URL EXISTENTE
+=====================================================
+*/
+
+const compressExistingDataUrl = (
+    dataUrl: string
+): Promise<string> =>
+    new Promise((resolve, reject) => {
+        if (
+            !dataUrl.startsWith(
+                'data:image'
+            )
+        ) {
+            resolve(dataUrl);
+            return;
+        }
+
+        /*
+        Se já estiver pequeno, não precisa
+        processar novamente.
+        */
+
+        if (
+            getBase64Size(dataUrl) <=
+            MAX_IMAGE_BYTES
+        ) {
+            resolve(dataUrl);
+            return;
+        }
+
+        const img = new Image();
+
+        img.onerror = () =>
+            reject(
+                new Error(
+                    'Erro ao carregar imagem existente.'
+                )
+            );
+
+        img.onload = async () => {
+            try {
+                let width =
+                    img.naturalWidth;
+
+                let height =
+                    img.naturalHeight;
+
+                if (
+                    width > MAX_WIDTH
+                ) {
+                    height =
+                        Math.round(
+                            (height *
+                                MAX_WIDTH) /
+                                width
+                        );
+
+                    width =
+                        MAX_WIDTH;
                 }
 
-                const canvas = document.createElement('canvas');
+                const canvas =
+                    document.createElement(
+                        'canvas'
+                    );
 
-                canvas.width = width;
-                canvas.height = height;
+                canvas.width =
+                    width;
 
-                const ctx = canvas.getContext('2d');
+                canvas.height =
+                    height;
+
+                const ctx =
+                    canvas.getContext(
+                        '2d'
+                    );
 
                 if (!ctx) {
                     reject(
                         new Error(
-                            'Não foi possível criar o Canvas.'
+                            'Canvas indisponível.'
                         )
                     );
 
                     return;
                 }
+
+                ctx.fillStyle =
+                    '#ffffff';
+
+                ctx.fillRect(
+                    0,
+                    0,
+                    width,
+                    height
+                );
 
                 ctx.drawImage(
                     img,
@@ -91,83 +590,107 @@ const processImageFile = (file: File): Promise<string> =>
                     height
                 );
 
-                // =====================================================
-                // MARCA D'ÁGUA
-                // =====================================================
+                let compressed =
+                    await canvasToCompressedDataUrl(
+                        canvas,
+                        0.7
+                    );
 
-                const fontSize = Math.max(
-                    22,
-                    Math.round(width * 0.035)
-                );
+                let attempts = 0;
 
-                const diagonal = Math.sqrt(
-                    width ** 2 + height ** 2
-                );
-
-                ctx.save();
-
-                ctx.globalAlpha = 0.05;
-
-                ctx.font = `700 ${fontSize}px Arial, sans-serif`;
-
-                ctx.fillStyle = '#ffffff';
-
-                ctx.textAlign = 'center';
-
-                ctx.textBaseline = 'middle';
-
-                ctx.shadowColor =
-                    'rgba(255,255,255,.85)';
-
-                ctx.shadowBlur = 3;
-
-                ctx.translate(
-                    width / 2,
-                    height / 2
-                );
-
-                ctx.rotate(-Math.PI / 6);
-
-                for (
-                    let y = -diagonal;
-                    y <= diagonal;
-                    y += fontSize * 4
+                while (
+                    getBase64Size(
+                        compressed
+                    ) >
+                        MAX_IMAGE_BYTES &&
+                    attempts < 3
                 ) {
-                    for (
-                        let x = -diagonal;
-                        x <= diagonal;
-                        x += fontSize * 8
-                    ) {
-                        ctx.fillText(
-                            'ateliemariadias',
-                            x,
-                            y
+                    attempts++;
+
+                    width = Math.round(
+                        width * 0.8
+                    );
+
+                    height = Math.round(
+                        height * 0.8
+                    );
+
+                    canvas.width =
+                        width;
+
+                    canvas.height =
+                        height;
+
+                    ctx.clearRect(
+                        0,
+                        0,
+                        width,
+                        height
+                    );
+
+                    ctx.fillStyle =
+                        '#ffffff';
+
+                    ctx.fillRect(
+                        0,
+                        0,
+                        width,
+                        height
+                    );
+
+                    ctx.drawImage(
+                        img,
+                        0,
+                        0,
+                        width,
+                        height
+                    );
+
+                    compressed =
+                        await canvasToCompressedDataUrl(
+                            canvas,
+                            0.6
                         );
-                    }
                 }
 
-                ctx.restore();
+                if (
+                    getBase64Size(
+                        compressed
+                    ) >
+                    MAX_IMAGE_BYTES
+                ) {
+                    reject(
+                        new Error(
+                            'Imagem existente ainda está muito grande.'
+                        )
+                    );
 
-                resolve(
-                    canvas.toDataURL(
-                        'image/jpeg',
-                        0.85
-                    )
-                );
-            };
+                    return;
+                }
 
-            img.src = reader.result as string;
+                resolve(compressed);
+            } catch (error) {
+                reject(error);
+            }
         };
 
-        reader.readAsDataURL(file);
+        img.src = dataUrl;
     });
+
+/*
+=====================================================
+ADMIN PAGE
+=====================================================
+*/
 
 function AdminPage() {
     const [products, setProducts] =
         useState<Product[]>([]);
 
     const [isEditing, setIsEditing] =
-        useState<Product['id'] | null>(null);
+        useState<Product['id'] | null>(
+            null
+        );
 
     const [itemToDelete, setItemToDelete] =
         useState<{
@@ -184,9 +707,14 @@ function AdminPage() {
     const [formData, setFormData] =
         useState(INITIAL_FORM);
 
-    // =====================================================
-    // ATUALIZAR FORMULÁRIO
-    // =====================================================
+    const [isSaving, setIsSaving] =
+        useState(false);
+
+    /*
+    =============================================
+    FORM
+    =============================================
+    */
 
     const updateForm = <
         K extends keyof typeof INITIAL_FORM
@@ -200,9 +728,11 @@ function AdminPage() {
         }));
     };
 
-    // =====================================================
-    // CARREGAR PRODUTOS
-    // =====================================================
+    /*
+    =============================================
+    CARREGAR PRODUTOS
+    =============================================
+    */
 
     const refreshProducts = async () => {
         try {
@@ -222,35 +752,15 @@ function AdminPage() {
         }
     };
 
-    // =====================================================
-    // PRIMEIRO CARREGAMENTO
-    // =====================================================
-
     useEffect(() => {
-        const loadProducts = async () => {
-            try {
-                const data =
-                    await productService.getProducts();
-
-                setProducts(data);
-            } catch (error) {
-                console.error(
-                    'Erro ao carregar produtos:',
-                    error
-                );
-
-                toast.error(
-                    'Erro ao carregar produtos.'
-                );
-            }
-        };
-
-        loadProducts();
+        refreshProducts();
     }, []);
 
-    // =====================================================
-    // UPLOAD DE IMAGENS
-    // =====================================================
+    /*
+    =============================================
+    UPLOAD
+    =============================================
+    */
 
     const handleImageUpload = async (
         e: React.ChangeEvent<HTMLInputElement>
@@ -266,7 +776,7 @@ function AdminPage() {
         if (
             formData.images.length +
                 files.length >
-            4
+            MAX_IMAGES
         ) {
             toast.error(
                 'Você só pode adicionar no máximo 4 fotos por produto.'
@@ -278,9 +788,18 @@ function AdminPage() {
         }
 
         try {
+            toast.loading(
+                'Comprimindo imagem...',
+                {
+                    id: 'image-processing',
+                }
+            );
+
             const images =
                 await Promise.all(
-                    files.map(processImageFile)
+                    files.map(
+                        processImageFile
+                    )
                 );
 
             setFormData(prev => ({
@@ -289,11 +808,17 @@ function AdminPage() {
                 images: [
                     ...prev.images,
                     ...images,
-                ].slice(0, 4),
+                ].slice(
+                    0,
+                    MAX_IMAGES
+                ),
             }));
 
             toast.success(
-                "Imagem adicionada com marca d'água!"
+                "Imagem comprimida e protegida com marca d'água!",
+                {
+                    id: 'image-processing',
+                }
             );
         } catch (error) {
             console.error(
@@ -302,47 +827,76 @@ function AdminPage() {
             );
 
             toast.error(
-                'Ocorreu um erro ao processar a imagem.'
+                'Não foi possível processar a imagem.',
+                {
+                    id: 'image-processing',
+                }
             );
         } finally {
             e.target.value = '';
         }
     };
 
-    // =====================================================
-    // REMOVER IMAGEM
-    // =====================================================
+    /*
+    =============================================
+    REMOVER IMAGEM
+    =============================================
+    */
 
-    const removeImage = (index: number) => {
+    const removeImage = (
+        index: number
+    ) => {
         setFormData(prev => ({
             ...prev,
 
-            images: prev.images.filter(
-                (_, i) => i !== index
-            ),
+            images:
+                prev.images.filter(
+                    (_, i) =>
+                        i !== index
+                ),
         }));
     };
 
-    // =====================================================
-    // EDITAR PRODUTO
-    // =====================================================
+    /*
+    =============================================
+    EDITAR
+    =============================================
+    */
 
-    const handleEdit = (product: Product) => {
-        setIsEditing(product.id);
+    const handleEdit = (
+        product: Product
+    ) => {
+        setIsEditing(
+            product.id
+        );
 
         setFormData({
-            title: product.title || '',
+            title:
+                product.title || '',
+
             description:
-                product.description || '',
+                product.description ||
+                '',
+
             category:
                 product.category ||
                 CATEGORIES[0],
-            price: product.price || '',
+
+            price:
+                product.price || '',
+
             measurements:
-                product.measurements || '',
-            images: getProductImages(product),
+                product.measurements ||
+                '',
+
+            images:
+                getProductImages(
+                    product
+                ),
+
             featured:
-                product.featured || false,
+                product.featured ||
+                false,
         });
 
         window.scrollTo({
@@ -351,9 +905,11 @@ function AdminPage() {
         });
     };
 
-    // =====================================================
-    // CANCELAR EDIÇÃO
-    // =====================================================
+    /*
+    =============================================
+    CANCELAR
+    =============================================
+    */
 
     const handleCancel = () => {
         setIsEditing(null);
@@ -364,9 +920,11 @@ function AdminPage() {
         });
     };
 
-    // =====================================================
-    // EXCLUIR PRODUTO
-    // =====================================================
+    /*
+    =============================================
+    EXCLUIR
+    =============================================
+    */
 
     const confirmDelete = async () => {
         if (!itemToDelete) {
@@ -397,14 +955,20 @@ function AdminPage() {
         }
     };
 
-    // =====================================================
-    // SALVAR / CADASTRAR PRODUTO
-    // =====================================================
+    /*
+    =============================================
+    SALVAR
+    =============================================
+    */
 
     const handleSubmit = async (
         e: React.FormEvent
     ) => {
         e.preventDefault();
+
+        if (isSaving) {
+            return;
+        }
 
         if (
             !formData.title.trim() ||
@@ -419,8 +983,7 @@ function AdminPage() {
         }
 
         if (
-            !formData.images ||
-            formData.images.length === 0
+            !formData.images.length
         ) {
             toast.error(
                 'Por favor, adicione pelo menos 1 foto para o produto.'
@@ -429,30 +992,125 @@ function AdminPage() {
             return;
         }
 
-        try {
-            // =================================================
-            // EDITAR
-            // =================================================
+        setIsSaving(true);
 
-            if (isEditing !== null) {
+        try {
+            /*
+            =============================================
+            GARANTIR QUE TODAS AS IMAGENS BASE64
+            ESTEJAM COMPRIMIDAS
+            =============================================
+            */
+
+            const finalImages =
+                await Promise.all(
+                    formData.images.map(
+                        async image => {
+                            if (
+                                image.startsWith(
+                                    'data:image'
+                                )
+                            ) {
+                                return compressExistingDataUrl(
+                                    image
+                                );
+                            }
+
+                            return image;
+                        }
+                    )
+                );
+
+            /*
+            =============================================
+            SEGURANÇA EXTRA
+            =============================================
+            */
+
+            const totalBase64Bytes =
+                finalImages.reduce(
+                    (total, image) => {
+                        if (
+                            image.startsWith(
+                                'data:image'
+                            )
+                        ) {
+                            return (
+                                total +
+                                getBase64Size(
+                                    image
+                                )
+                            );
+                        }
+
+                        return total;
+                    },
+                    0
+                );
+
+            console.log(
+                'Tamanho total das imagens:',
+                Math.round(
+                    totalBase64Bytes /
+                        1024
+                ),
+                'KB'
+            );
+
+            /*
+            4 imagens de aproximadamente
+            120 KB = ~480 KB binários.
+            Mesmo em Base64 fica confortavelmente
+            abaixo do limite do Firestore.
+            */
+
+            if (
+                totalBase64Bytes >
+                650 * 1024
+            ) {
+                throw new Error(
+                    'As imagens ainda estão muito grandes. Remova uma imagem e tente novamente.'
+                );
+            }
+
+            const productData = {
+                title:
+                    formData.title.trim(),
+
+                description:
+                    formData.description.trim(),
+
+                category:
+                    formData.category,
+
+                price:
+                    formData.price.trim(),
+
+                measurements:
+                    formData.measurements.trim(),
+
+                images:
+                    finalImages,
+
+                image:
+                    finalImages[0],
+
+                featured:
+                    formData.featured,
+            };
+
+            /*
+            =============================================
+            EDITAR
+            =============================================
+            */
+
+            if (
+                isEditing !== null
+            ) {
                 await productService.updateProduct(
                     isEditing,
-                    {
-                        title: formData.title,
-                        description:
-                            formData.description,
-                        category:
-                            formData.category,
-                        price: formData.price,
-                        measurements:
-                            formData.measurements,
-                        images:
-                            formData.images,
-                        image:
-                            formData.images[0],
-                        featured:
-                            formData.featured,
-                    }
+                    productData
                 );
 
                 toast.success(
@@ -460,94 +1118,128 @@ function AdminPage() {
                 );
             }
 
-            // =================================================
-            // NOVO PRODUTO
-            // =================================================
+            /*
+            =============================================
+            NOVO
+            =============================================
+            */
 
             else {
-                // IMPORTANTE:
-                // NÃO criamos ID aqui.
-                // O Firebase gera automaticamente.
-
-                await productService.addProduct({
-                    title: formData.title,
-                    description:
-                        formData.description,
-                    category:
-                        formData.category,
-                    price: formData.price,
-                    measurements:
-                        formData.measurements,
-                    images:
-                        formData.images,
-                    image:
-                        formData.images[0],
-                    featured:
-                        formData.featured,
-                } as Omit<Product, 'id'>);
+                await productService.addProduct(
+                    productData
+                );
 
                 toast.success(
                     'Produto cadastrado com sucesso!'
                 );
             }
 
-            // =================================================
-            // ATUALIZA A LISTA
-            // =================================================
+            /*
+            =============================================
+            ATUALIZAR LISTA
+            =============================================
+            */
 
             await refreshProducts();
 
             handleCancel();
-
         } catch (error) {
             console.error(
-                'ERRO AO SALVAR PRODUTO:',
+                'ERRO COMPLETO AO SALVAR PRODUTO:',
                 error
             );
 
-            toast.error(
+            let message =
                 isEditing !== null
                     ? 'Erro ao atualizar produto.'
-                    : 'Erro ao cadastrar produto.'
-            );
+                    : 'Erro ao cadastrar produto.';
+
+            if (
+                error instanceof Error
+            ) {
+                console.error(
+                    'Mensagem:',
+                    error.message
+                );
+
+                /*
+                Mensagens específicas
+                */
+
+                if (
+                    error.message.includes(
+                        'too large'
+                    ) ||
+                    error.message.includes(
+                        'large'
+                    )
+                ) {
+                    message =
+                        'As imagens ficaram grandes demais. Tente usar menos fotos.';
+                }
+
+                if (
+                    error.message.includes(
+                        'permission-denied'
+                    )
+                ) {
+                    message =
+                        'O Firebase recusou a operação por permissão.';
+                }
+            }
+
+            toast.error(message);
+        } finally {
+            setIsSaving(false);
         }
     };
 
-    // =====================================================
-    // FILTROS
-    // =====================================================
+    /*
+    =============================================
+    FILTROS
+    =============================================
+    */
 
     const filteredProducts =
-        products.filter(product => {
-            const search =
-                searchTerm.toLowerCase();
+        products.filter(
+            product => {
+                const search =
+                    searchTerm.toLowerCase();
 
-            const title =
-                product.title?.toLowerCase() ||
-                '';
+                const title =
+                    product.title?.toLowerCase() ||
+                    '';
 
-            const description =
-                product.description?.toLowerCase() ||
-                '';
+                const description =
+                    product.description?.toLowerCase() ||
+                    '';
 
-            const matchesSearch =
-                title.includes(search) ||
-                description.includes(search);
+                const matchesSearch =
+                    title.includes(
+                        search
+                    ) ||
+                    description.includes(
+                        search
+                    );
 
-            const matchesCategory =
-                selectedCategory === 'Todas' ||
-                product.category ===
-                    selectedCategory;
+                const matchesCategory =
+                    selectedCategory ===
+                        'Todas' ||
+                    product.category ===
+                        selectedCategory;
 
-            return (
-                matchesSearch &&
-                matchesCategory
-            );
-        });
+                return (
+                    matchesSearch &&
+                    matchesCategory
+                );
+            }
+        );
 
-    // =====================================================
-    // DESTAQUES
-    // =====================================================
+    /*
+    =============================================
+    DESTAQUES
+    =============================================
+    */
 
     const toggleFeatured = (
         checked: boolean
@@ -557,7 +1249,8 @@ function AdminPage() {
                 products.filter(
                     p =>
                         p.featured &&
-                        p.id !== isEditing
+                        p.id !==
+                            isEditing
                 ).length;
 
             if (count >= 4) {
@@ -575,9 +1268,11 @@ function AdminPage() {
         );
     };
 
-    // =====================================================
-    // JSX
-    // =====================================================
+    /*
+    =============================================
+    JSX
+    =============================================
+    */
 
     return (
         <div className="admin-page">
@@ -706,6 +1401,12 @@ function AdminPage() {
                 .btn-primary:hover {
                     background: #8e4b4b;
                     transform: translateY(-1px);
+                }
+
+                .btn-primary:disabled {
+                    opacity: .65;
+                    cursor: not-allowed;
+                    transform: none;
                 }
 
                 .btn-secondary {
@@ -919,34 +1620,28 @@ function AdminPage() {
                         box-sizing: border-box;
                         text-align: center;
                     }
+
+                    .btn-primary,
+                    .btn-secondary {
+                        flex: 1;
+                    }
                 }
 
             `}</style>
 
-            {/* =====================================================
-                TÍTULO
-            ===================================================== */}
-
             <h1 className="admin-page-title">
                 Painel do Administrador
             </h1>
-
-            {/* =====================================================
-                GERADOR DE PEDIDOS
-            ===================================================== */}
 
             <div className="admin-order-container">
                 <Link
                     to="/admin/gerador-pedidos"
                     className="admin-order"
                 >
-                    🖼️ Gerar Comprovante de Pedido (Imagem)
+                    🖼️ Gerar Comprovante de Pedido
+                    (Imagem)
                 </Link>
             </div>
-
-            {/* =====================================================
-                FORMULÁRIO
-            ===================================================== */}
 
             <div className="admin-card">
 
@@ -957,14 +1652,14 @@ function AdminPage() {
                 </h2>
 
                 <form
-                    onSubmit={handleSubmit}
+                    onSubmit={
+                        handleSubmit
+                    }
                     style={{
                         display: 'grid',
                         gap: '1.2rem',
                     }}
                 >
-
-                    {/* TÍTULO */}
 
                     <div>
                         <label className="admin-label">
@@ -974,7 +1669,9 @@ function AdminPage() {
                         <input
                             required
                             type="text"
-                            value={formData.title}
+                            value={
+                                formData.title
+                            }
                             onChange={e =>
                                 updateForm(
                                     'title',
@@ -985,8 +1682,6 @@ function AdminPage() {
                             placeholder="Ex: Manta Piquet Bordada"
                         />
                     </div>
-
-                    {/* CATEGORIA / PREÇO */}
 
                     <div className="form-grid-two">
 
@@ -1002,7 +1697,8 @@ function AdminPage() {
                                 onChange={e =>
                                     updateForm(
                                         'category',
-                                        e.target.value as ProductCategory
+                                        e.target
+                                            .value as ProductCategory
                                     )
                                 }
                                 className="admin-input"
@@ -1017,7 +1713,9 @@ function AdminPage() {
                                                 category
                                             }
                                         >
-                                            {category}
+                                            {
+                                                category
+                                            }
                                         </option>
                                     )
                                 )}
@@ -1048,8 +1746,6 @@ function AdminPage() {
 
                     </div>
 
-                    {/* MEDIDAS */}
-
                     <div>
 
                         <label className="admin-label">
@@ -1073,12 +1769,11 @@ function AdminPage() {
 
                     </div>
 
-                    {/* IMAGENS */}
-
                     <div>
 
                         <label className="admin-label">
-                            Fotos do Produto (Até 4 fotos) *
+                            Fotos do Produto
+                            (Até 4 fotos) *
                         </label>
 
                         <input
@@ -1088,22 +1783,30 @@ function AdminPage() {
                             onChange={
                                 handleImageUpload
                             }
+                            disabled={
+                                isSaving
+                            }
                             style={{
                                 marginBottom:
                                     '.8rem',
-                                fontSize: '.9rem',
-                                color: '#625353',
+                                fontSize:
+                                    '.9rem',
+                                color:
+                                    '#625353',
+                                maxWidth:
+                                    '100%',
                             }}
                         />
 
                         <div
                             style={{
-                                display: 'flex',
+                                display:
+                                    'flex',
                                 gap: '.75rem',
-                                flexWrap: 'wrap',
+                                flexWrap:
+                                    'wrap',
                             }}
                         >
-
                             {formData.images.map(
                                 (
                                     image,
@@ -1128,7 +1831,9 @@ function AdminPage() {
                                             />
                                         ) : (
                                             <div className="image-placeholder">
-                                                {image}
+                                                {
+                                                    image
+                                                }
                                             </div>
                                         )}
 
@@ -1148,28 +1853,22 @@ function AdminPage() {
                                     </div>
                                 )
                             )}
-
                         </div>
 
                         <div className="info-box">
-
                             🔒{' '}
                             <strong>
                                 Proteção ativada:
                             </strong>{' '}
-                            todas as imagens novas
-                            recebem automaticamente
-                            a marca d'água{' '}
-                            <strong>
-                                ateliemariadias
-                            </strong>{' '}
-                            diretamente no arquivo.
-
+                            as imagens recebem
+                            marca d'água e são
+                            automaticamente
+                            comprimidas para
+                            funcionar também
+                            em celulares.
                         </div>
 
                     </div>
-
-                    {/* DESCRIÇÃO */}
 
                     <div>
 
@@ -1191,19 +1890,20 @@ function AdminPage() {
                             }
                             className="admin-input"
                             style={{
-                                resize: 'vertical',
+                                resize:
+                                    'vertical',
                             }}
                             placeholder="Descreva detalhes como tipo de tecido, acabamento, etc."
                         />
 
                     </div>
 
-                    {/* DESTAQUE */}
-
                     <div
                         style={{
-                            display: 'flex',
-                            alignItems: 'center',
+                            display:
+                                'flex',
+                            alignItems:
+                                'center',
                             gap: '.6rem',
                         }}
                     >
@@ -1216,13 +1916,15 @@ function AdminPage() {
                             }
                             onChange={e =>
                                 toggleFeatured(
-                                    e.target.checked
+                                    e.target
+                                        .checked
                                 )
                             }
                             style={{
                                 width: 18,
                                 height: 18,
-                                cursor: 'pointer',
+                                cursor:
+                                    'pointer',
                                 accentColor:
                                     '#A35858',
                             }}
@@ -1231,46 +1933,61 @@ function AdminPage() {
                         <label
                             htmlFor="featured"
                             style={{
-                                fontSize: '.92rem',
-                                cursor: 'pointer',
-                                color: '#2D2323',
-                                fontWeight: 500,
+                                fontSize:
+                                    '.92rem',
+                                cursor:
+                                    'pointer',
+                                color:
+                                    '#2D2323',
+                                fontWeight:
+                                    500,
                                 userSelect:
                                     'none',
                             }}
                         >
-                            Destaque na página inicial
+                            Destaque na
+                            página inicial
                             (Máx. 4)
                         </label>
 
                     </div>
 
-                    {/* BOTÕES */}
-
                     <div
                         style={{
-                            display: 'flex',
+                            display:
+                                'flex',
                             gap: '.8rem',
-                            marginTop: '.5rem',
+                            marginTop:
+                                '.5rem',
                         }}
                     >
 
                         <button
                             type="submit"
                             className="btn-primary"
+                            disabled={
+                                isSaving
+                            }
                         >
-                            {isEditing !== null
+                            {isSaving
+                                ? 'Salvando...'
+                                : isEditing !==
+                                  null
                                 ? 'Salvar Alterações'
                                 : 'Cadastrar Produto'}
                         </button>
 
-                        {isEditing !== null && (
+                        {isEditing !==
+                            null && (
                             <button
                                 type="button"
                                 onClick={
                                     handleCancel
                                 }
                                 className="btn-secondary"
+                                disabled={
+                                    isSaving
+                                }
                             >
                                 Cancelar
                             </button>
@@ -1282,38 +1999,39 @@ function AdminPage() {
 
             </div>
 
-            {/* =====================================================
-                TÍTULO DA LISTA
-            ===================================================== */}
-
             <div
                 style={{
-                    display: 'flex',
+                    display:
+                        'flex',
                     justifyContent:
                         'space-between',
-                    alignItems: 'center',
-                    marginBottom: '1rem',
+                    alignItems:
+                        'center',
+                    marginBottom:
+                        '1rem',
                 }}
             >
 
                 <h2
                     style={{
-                        fontSize: '1.3rem',
-                        color: '#2D2323',
-                        fontWeight: 600,
+                        fontSize:
+                            '1.3rem',
+                        color:
+                            '#2D2323',
+                        fontWeight:
+                            600,
                         margin: 0,
                     }}
                 >
                     Produtos Cadastrados (
-                    {filteredProducts.length} de{' '}
+                    {
+                        filteredProducts.length
+                    }{' '}
+                    de{' '}
                     {products.length})
                 </h2>
 
             </div>
-
-            {/* =====================================================
-                FILTROS
-            ===================================================== */}
 
             <div className="filter-bar">
 
@@ -1351,7 +2069,8 @@ function AdminPage() {
                         }
                         onChange={e =>
                             setSelectedCategory(
-                                e.target.value
+                                e.target
+                                    .value
                             )
                         }
                         className="admin-input"
@@ -1371,7 +2090,9 @@ function AdminPage() {
                                         category
                                     }
                                 >
-                                    {category}
+                                    {
+                                        category
+                                    }
                                 </option>
                             )
                         )}
@@ -1382,18 +2103,16 @@ function AdminPage() {
 
             </div>
 
-            {/* =====================================================
-                LISTA DE PRODUTOS
-            ===================================================== */}
-
             <div
                 style={{
-                    display: 'grid',
+                    display:
+                        'grid',
                     gap: '.8rem',
                 }}
             >
 
-                {filteredProducts.length > 0 ? (
+                {filteredProducts.length >
+                0 ? (
 
                     filteredProducts.map(
                         product => {
@@ -1401,7 +2120,8 @@ function AdminPage() {
                             const mainImage =
                                 getProductImages(
                                     product
-                                )[0] || '';
+                                )[0] ||
+                                '';
 
                             return (
                                 <div
@@ -1418,13 +2138,15 @@ function AdminPage() {
                                                 'flex',
                                             alignItems:
                                                 'center',
-                                            gap: '1rem',
+                                            gap:
+                                                '1rem',
                                             textDecoration:
                                                 'none',
                                             color:
                                                 'inherit',
                                             flex: 1,
-                                            minWidth: 0,
+                                            minWidth:
+                                                0,
                                         }}
                                     >
 
@@ -1471,7 +2193,8 @@ function AdminPage() {
                                         <div
                                             className="product-info"
                                             style={{
-                                                minWidth: 0,
+                                                minWidth:
+                                                    0,
                                             }}
                                         >
 
@@ -1540,17 +2263,15 @@ function AdminPage() {
                 ) : (
 
                     <div className="empty-products">
-                        Nenhum produto encontrado
-                        com os filtros aplicados.
+                        Nenhum produto
+                        encontrado com
+                        os filtros
+                        aplicados.
                     </div>
 
                 )}
 
             </div>
-
-            {/* =====================================================
-                MODAL DE EXCLUSÃO
-            ===================================================== */}
 
             {itemToDelete && (
 
@@ -1560,7 +2281,8 @@ function AdminPage() {
 
                         <div
                             style={{
-                                fontSize: '2.5rem',
+                                fontSize:
+                                    '2.5rem',
                                 marginBottom:
                                     '.5rem',
                             }}
@@ -1570,9 +2292,12 @@ function AdminPage() {
 
                         <h3
                             style={{
-                                fontSize: '1.25rem',
-                                color: '#2D2323',
-                                fontWeight: 600,
+                                fontSize:
+                                    '1.25rem',
+                                color:
+                                    '#2D2323',
+                                fontWeight:
+                                    600,
                                 marginBottom:
                                     '.6rem',
                             }}
@@ -1582,15 +2307,19 @@ function AdminPage() {
 
                         <p
                             style={{
-                                fontSize: '.92rem',
-                                color: '#625353',
-                                lineHeight: 1.5,
+                                fontSize:
+                                    '.92rem',
+                                color:
+                                    '#625353',
+                                lineHeight:
+                                    1.5,
                                 marginBottom:
                                     '1.5rem',
                             }}
                         >
-                            Tem certeza de que
-                            deseja remover o
+                            Tem certeza de
+                            que deseja
+                            remover o
                             produto{' '}
 
                             <strong
@@ -1599,10 +2328,15 @@ function AdminPage() {
                                         '#2D2323',
                                 }}
                             >
-                                "{itemToDelete.title}"
+                                "
+                                {
+                                    itemToDelete.title
+                                }
+                                "
                             </strong>
 
-                            ? Esta ação não poderá
+                            ? Esta ação
+                            não poderá
                             ser desfeita.
                         </p>
 
@@ -1627,7 +2361,8 @@ function AdminPage() {
                                 }
                                 className="btn-action-delete"
                                 style={{
-                                    borderRadius: 14,
+                                    borderRadius:
+                                        14,
                                 }}
                             >
                                 Sim, excluir

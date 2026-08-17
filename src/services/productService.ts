@@ -1,4 +1,5 @@
 import { db } from './firebase';
+
 import {
     collection,
     getDocs,
@@ -7,10 +8,46 @@ import {
     updateDoc,
     deleteDoc,
     addDoc,
+    serverTimestamp,
 } from 'firebase/firestore';
-import type { Product } from '../types';
+
+import type {
+    Product,
+    ProductCategory,
+} from '../types';
 
 const COLLECTION_NAME = 'produtos';
+
+// =====================================================
+// CATEGORIAS VÁLIDAS
+// =====================================================
+
+const CATEGORIES: ProductCategory[] = [
+    'Enxoval de Bebê',
+    'Batizado',
+    'Toalhas Personalizadas',
+    'Acessórios & Maternidade',
+    'Decoração do Quartinho',
+];
+
+// =====================================================
+// VALIDAR CATEGORIA
+// =====================================================
+
+const getValidCategory = (
+    category: unknown
+): ProductCategory => {
+    if (
+        typeof category === 'string' &&
+        CATEGORIES.includes(
+            category as ProductCategory
+        )
+    ) {
+        return category as ProductCategory;
+    }
+
+    return 'Enxoval de Bebê';
+};
 
 // =====================================================
 // BUSCAR PRODUTOS
@@ -18,22 +55,86 @@ const COLLECTION_NAME = 'produtos';
 
 export async function getProducts(): Promise<Product[]> {
     try {
-        const snapshot = await getDocs(
-            collection(db, COLLECTION_NAME)
+        const productsRef = collection(
+            db,
+            COLLECTION_NAME
         );
 
-        return snapshot.docs.map(docSnap => ({
-            ...docSnap.data(),
-            id: docSnap.id,
-        })) as unknown as Product[];
+        const snapshot =
+            await getDocs(productsRef);
+
+        const products: Product[] =
+            snapshot.docs.map(docSnap => {
+                const data = docSnap.data();
+
+                const images = Array.isArray(
+                    data.images
+                )
+                    ? data.images.filter(
+                          (
+                              image
+                          ): image is string =>
+                              typeof image ===
+                              'string'
+                      )
+                    : [];
+
+                const image =
+                    typeof data.image ===
+                    'string'
+                        ? data.image
+                        : images[0];
+
+                return {
+                    id: docSnap.id,
+
+                    title:
+                        typeof data.title ===
+                        'string'
+                            ? data.title
+                            : '',
+
+                    description:
+                        typeof data.description ===
+                        'string'
+                            ? data.description
+                            : '',
+
+                    category:
+                        getValidCategory(
+                            data.category
+                        ),
+
+                    price:
+                        typeof data.price ===
+                        'string'
+                            ? data.price
+                            : '',
+
+                    images,
+
+                    image,
+
+                    featured:
+                        data.featured === true,
+
+                    measurements:
+                        typeof data.measurements ===
+                        'string'
+                            ? data.measurements
+                            : '',
+                };
+            });
+
+        return products;
 
     } catch (error) {
         console.error(
-            'Erro ao buscar produtos:',
+            'ERRO AO BUSCAR PRODUTOS:',
             error
         );
 
-        return [];
+        throw error;
     }
 }
 
@@ -46,27 +147,51 @@ export async function saveProducts(
 ): Promise<void> {
     try {
         for (const product of products) {
-            if (
-                product.id === undefined ||
-                product.id === null
-            ) {
+            if (!product.id) {
                 continue;
             }
 
+            const productRef = doc(
+                db,
+                COLLECTION_NAME,
+                String(product.id)
+            );
+
             await setDoc(
-                doc(
-                    db,
-                    COLLECTION_NAME,
-                    String(product.id)
-                ),
-                product,
-                { merge: true }
+                productRef,
+                {
+                    title: product.title,
+                    description:
+                        product.description,
+
+                    category:
+                        product.category,
+
+                    price: product.price,
+
+                    images:
+                        product.images ?? [],
+
+                    image:
+                        product.image ??
+                        product.images?.[0] ??
+                        '',
+
+                    featured:
+                        product.featured ?? false,
+
+                    measurements:
+                        product.measurements ?? '',
+                },
+                {
+                    merge: true,
+                }
             );
         }
 
     } catch (error) {
         console.error(
-            'Erro ao salvar produtos no Firestore:',
+            'ERRO AO SALVAR PRODUTOS:',
             error
         );
 
@@ -83,23 +208,75 @@ export async function addProduct(
 ): Promise<Product> {
     try {
         const dataToAdd = {
-            ...newProduct,
-            createdAt: new Date(),
+            title: newProduct.title,
+
+            description:
+                newProduct.description,
+
+            category:
+                newProduct.category,
+
+            price: newProduct.price,
+
+            images:
+                newProduct.images ?? [],
+
+            image:
+                newProduct.image ??
+                newProduct.images?.[0] ??
+                '',
+
+            featured:
+                newProduct.featured ?? false,
+
+            measurements:
+                newProduct.measurements ?? '',
+
+            createdAt:
+                serverTimestamp(),
         };
 
-        const docRef = await addDoc(
-            collection(db, COLLECTION_NAME),
-            dataToAdd
-        );
+        const productsRef =
+            collection(
+                db,
+                COLLECTION_NAME
+            );
+
+        const docRef =
+            await addDoc(
+                productsRef,
+                dataToAdd
+            );
 
         return {
-            ...dataToAdd,
             id: docRef.id,
-        } as unknown as Product;
+
+            title: dataToAdd.title,
+
+            description:
+                dataToAdd.description,
+
+            category:
+                dataToAdd.category,
+
+            price: dataToAdd.price,
+
+            images:
+                dataToAdd.images,
+
+            image:
+                dataToAdd.image,
+
+            featured:
+                dataToAdd.featured,
+
+            measurements:
+                dataToAdd.measurements,
+        };
 
     } catch (error) {
         console.error(
-            'Erro ao adicionar produto:',
+            'ERRO AO ADICIONAR PRODUTO:',
             error
         );
 
@@ -112,29 +289,106 @@ export async function addProduct(
 // =====================================================
 
 export async function updateProduct(
-    id: number | string,
+    id: string,
     updatedData: Partial<Product>
 ): Promise<Product> {
     try {
-        const docRef = doc(
+        const productRef = doc(
             db,
             COLLECTION_NAME,
             String(id)
         );
 
+        const dataToUpdate = {
+            ...(updatedData.title !==
+            undefined && {
+                title:
+                    updatedData.title,
+            }),
+
+            ...(updatedData.description !==
+            undefined && {
+                description:
+                    updatedData.description,
+            }),
+
+            ...(updatedData.category !==
+            undefined && {
+                category:
+                    updatedData.category,
+            }),
+
+            ...(updatedData.price !==
+            undefined && {
+                price:
+                    updatedData.price,
+            }),
+
+            ...(updatedData.images !==
+            undefined && {
+                images:
+                    updatedData.images,
+            }),
+
+            ...(updatedData.image !==
+            undefined && {
+                image:
+                    updatedData.image,
+            }),
+
+            ...(updatedData.featured !==
+            undefined && {
+                featured:
+                    updatedData.featured,
+            }),
+
+            ...(updatedData.measurements !==
+            undefined && {
+                measurements:
+                    updatedData.measurements,
+            }),
+        };
+
         await updateDoc(
-            docRef,
-            updatedData as Record<string, unknown>
+            productRef,
+            dataToUpdate
         );
 
         return {
-            ...updatedData,
             id,
-        } as unknown as Product;
+
+            title:
+                updatedData.title ?? '',
+
+            description:
+                updatedData.description ?? '',
+
+            category:
+                updatedData.category ??
+                'Enxoval de Bebê',
+
+            price:
+                updatedData.price ?? '',
+
+            images:
+                updatedData.images ?? [],
+
+            image:
+                updatedData.image ??
+                updatedData.images?.[0],
+
+            featured:
+                updatedData.featured ??
+                false,
+
+            measurements:
+                updatedData.measurements ??
+                '',
+        };
 
     } catch (error) {
         console.error(
-            'Erro ao atualizar produto:',
+            'ERRO AO ATUALIZAR PRODUTO:',
             error
         );
 
@@ -147,22 +401,24 @@ export async function updateProduct(
 // =====================================================
 
 export async function deleteProduct(
-    id: number | string
-): Promise<string | number> {
+    id: string
+): Promise<string> {
     try {
+        const productRef = doc(
+            db,
+            COLLECTION_NAME,
+            String(id)
+        );
+
         await deleteDoc(
-            doc(
-                db,
-                COLLECTION_NAME,
-                String(id)
-            )
+            productRef
         );
 
         return id;
 
     } catch (error) {
         console.error(
-            'Erro ao deletar produto:',
+            'ERRO AO DELETAR PRODUTO:',
             error
         );
 
@@ -177,10 +433,25 @@ export async function deleteProduct(
 export async function initializeDefaultProducts(
     defaultProducts: Product[]
 ): Promise<void> {
-    const current = await getProducts();
+    try {
+        const currentProducts =
+            await getProducts();
 
-    if (current.length === 0) {
-        await saveProducts(defaultProducts);
+        if (
+            currentProducts.length === 0
+        ) {
+            await saveProducts(
+                defaultProducts
+            );
+        }
+
+    } catch (error) {
+        console.error(
+            'ERRO AO INICIALIZAR PRODUTOS:',
+            error
+        );
+
+        throw error;
     }
 }
 
