@@ -30,18 +30,32 @@ CONFIGURAÇÃO DAS IMAGENS
 
 const MAX_IMAGES = 4;
 
-// Tamanho máximo aproximado de cada imagem.
-// Mantemos bem abaixo do limite do Firestore.
-const MAX_IMAGE_BYTES = 120 * 1024;
+// Limite aproximado por imagem
+const MAX_IMAGE_BYTES = 140 * 1024;
 
-// Dimensão máxima.
+// Largura máxima
 const MAX_WIDTH = 1000;
 
-// Qualidade mínima permitida.
+// Qualidade inicial do JPEG
+const INITIAL_QUALITY = 0.78;
+
+// Qualidade mínima
 const MIN_QUALITY = 0.45;
 
-const getProductImages = (product: Product): string[] => {
-    if (product.images && product.images.length > 0) {
+
+/*
+=====================================================
+OBTER IMAGENS DO PRODUTO
+=====================================================
+*/
+
+const getProductImages = (
+    product: Product
+): string[] => {
+    if (
+        product.images &&
+        product.images.length > 0
+    ) {
         return product.images;
     }
 
@@ -52,10 +66,23 @@ const getProductImages = (product: Product): string[] => {
     return [];
 };
 
-const isImageUrl = (value: string) =>
-    value.startsWith('http') ||
-    value.startsWith('https') ||
-    value.startsWith('data:');
+
+/*
+=====================================================
+VERIFICAR URL DE IMAGEM
+=====================================================
+*/
+
+const isImageUrl = (
+    value: string
+) => {
+    return (
+        value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('data:image/')
+    );
+};
+
 
 /*
 =====================================================
@@ -63,13 +90,225 @@ ESTIMAR TAMANHO DO BASE64
 =====================================================
 */
 
-const getBase64Size = (dataUrl: string): number => {
-    const base64 = dataUrl.split(',')[1] || '';
+const getBase64Size = (
+    dataUrl: string
+): number => {
+    const base64 =
+        dataUrl.split(',')[1] || '';
 
     return Math.floor(
         (base64.length * 3) / 4
     );
 };
+
+
+/*
+=====================================================
+CANVAS -> DATA URL
+
+Usamos toBlob() em vez de toDataURL()
+para reduzir consumo de memória em celulares.
+=====================================================
+*/
+
+const canvasToDataUrl = (
+    canvas: HTMLCanvasElement,
+    quality: number
+): Promise<string> => {
+    return new Promise(
+        (resolve, reject) => {
+            canvas.toBlob(
+                blob => {
+                    if (!blob) {
+                        reject(
+                            new Error(
+                                'Não foi possível gerar a imagem.'
+                            )
+                        );
+
+                        return;
+                    }
+
+                    const reader =
+                        new FileReader();
+
+                    reader.onerror = () => {
+                        reject(
+                            new Error(
+                                'Erro ao converter a imagem.'
+                            )
+                        );
+                    };
+
+                    reader.onloadend = () => {
+                        resolve(
+                            reader.result as string
+                        );
+                    };
+
+                    reader.readAsDataURL(
+                        blob
+                    );
+                },
+                'image/jpeg',
+                quality
+            );
+        }
+    );
+};
+
+
+/*
+=====================================================
+APLICAR MARCA D'ÁGUA
+=====================================================
+*/
+
+const applyWatermark = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number
+) => {
+    const fontSize =
+        Math.max(
+            18,
+            Math.round(
+                width * 0.028
+            )
+        );
+
+    const diagonal =
+        Math.sqrt(
+            width ** 2 +
+            height ** 2
+        );
+
+    ctx.save();
+
+    ctx.globalAlpha = 0.055;
+
+    ctx.font =
+        `700 ${fontSize}px Arial, sans-serif`;
+
+    ctx.fillStyle = '#ffffff';
+
+    ctx.textAlign = 'center';
+
+    ctx.textBaseline = 'middle';
+
+    ctx.shadowColor =
+        'rgba(0,0,0,0.25)';
+
+    ctx.shadowBlur = 2;
+
+    ctx.translate(
+        width / 2,
+        height / 2
+    );
+
+    ctx.rotate(
+        -Math.PI / 6
+    );
+
+    const horizontalSpacing =
+        fontSize * 8;
+
+    const verticalSpacing =
+        fontSize * 4;
+
+    for (
+        let y = -diagonal;
+        y <= diagonal;
+        y += verticalSpacing
+    ) {
+        for (
+            let x = -diagonal;
+            x <= diagonal;
+            x += horizontalSpacing
+        ) {
+            ctx.fillText(
+                'ateliemariadias',
+                x,
+                y
+            );
+        }
+    }
+
+    ctx.restore();
+};
+
+
+/*
+=====================================================
+CRIAR CANVAS PROCESSADO
+=====================================================
+*/
+
+const createProcessedCanvas = (
+    img: HTMLImageElement,
+    width: number,
+    height: number
+): HTMLCanvasElement => {
+    const canvas =
+        document.createElement(
+            'canvas'
+        );
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx =
+        canvas.getContext(
+            '2d',
+            {
+                alpha: false,
+            }
+        );
+
+    if (!ctx) {
+        throw new Error(
+            'Não foi possível criar o Canvas.'
+        );
+    }
+
+    /*
+    Fundo branco
+    */
+
+    ctx.fillStyle = '#ffffff';
+
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+    /*
+    Imagem
+    */
+
+    ctx.drawImage(
+        img,
+        0,
+        0,
+        width,
+        height
+    );
+
+    /*
+    Marca d'água
+    */
+
+    applyWatermark(
+        ctx,
+        width,
+        height
+    );
+
+    return canvas;
+};
+
 
 /*
 =====================================================
@@ -77,37 +316,40 @@ COMPRIMIR CANVAS
 =====================================================
 */
 
-const canvasToCompressedDataUrl = (
-    canvas: HTMLCanvasElement,
-    initialQuality = 0.75
+const compressCanvas = async (
+    canvas: HTMLCanvasElement
 ): Promise<string> => {
-    return new Promise(resolve => {
-        let quality = initialQuality;
-        let result = canvas.toDataURL(
-            'image/jpeg',
+    let quality =
+        INITIAL_QUALITY;
+
+    let result =
+        await canvasToDataUrl(
+            canvas,
             quality
         );
 
-        /*
-        Tenta reduzir progressivamente a qualidade
-        até atingir o tamanho desejado.
-        */
+    /*
+    Reduz a qualidade até atingir
+    o tamanho desejado.
+    */
 
-        while (
-            getBase64Size(result) > MAX_IMAGE_BYTES &&
-            quality > MIN_QUALITY
-        ) {
-            quality -= 0.05;
+    while (
+        getBase64Size(result) >
+            MAX_IMAGE_BYTES &&
+        quality > MIN_QUALITY
+    ) {
+        quality -= 0.07;
 
-            result = canvas.toDataURL(
-                'image/jpeg',
+        result =
+            await canvasToDataUrl(
+                canvas,
                 quality
             );
-        }
+    }
 
-        resolve(result);
-    });
+    return result;
 };
+
 
 /*
 =====================================================
@@ -117,25 +359,270 @@ PROCESSAR ARQUIVO DE IMAGEM
 
 const processImageFile = (
     file: File
-): Promise<string> =>
-    new Promise((resolve, reject) => {
-        const reader = new FileReader();
+): Promise<string> => {
+    return new Promise(
+        (resolve, reject) => {
 
-        reader.onerror = () => {
-            reject(
-                new Error(
-                    'Erro ao ler o arquivo de imagem.'
+            /*
+            Verifica se realmente é imagem
+            */
+
+            if (
+                !file.type.startsWith(
+                    'image/'
                 )
-            );
-        };
+            ) {
+                reject(
+                    new Error(
+                        'O arquivo selecionado não é uma imagem válida.'
+                    )
+                );
 
-        reader.onload = () => {
-            const img = new Image();
+                return;
+            }
+
+            const reader =
+                new FileReader();
+
+            reader.onerror = () => {
+                reject(
+                    new Error(
+                        'Erro ao ler o arquivo de imagem.'
+                    )
+                );
+            };
+
+            reader.onload = () => {
+                const img =
+                    new Image();
+
+                img.onerror = () => {
+                    reject(
+                        new Error(
+                            'O navegador não conseguiu abrir esta imagem.'
+                        )
+                    );
+                };
+
+                img.onload = async () => {
+                    try {
+                        let width =
+                            img.naturalWidth;
+
+                        let height =
+                            img.naturalHeight;
+
+                        /*
+                        Segurança
+                        */
+
+                        if (
+                            !width ||
+                            !height
+                        ) {
+                            throw new Error(
+                                'Imagem com dimensões inválidas.'
+                            );
+                        }
+
+                        /*
+                        Redimensiona
+                        */
+
+                        if (
+                            width >
+                            MAX_WIDTH
+                        ) {
+                            height =
+                                Math.round(
+                                    (
+                                        height *
+                                        MAX_WIDTH
+                                    ) /
+                                    width
+                                );
+
+                            width =
+                                MAX_WIDTH;
+                        }
+
+                        /*
+                        Cria canvas
+                        */
+
+                        let canvas =
+                            createProcessedCanvas(
+                                img,
+                                width,
+                                height
+                            );
+
+                        /*
+                        Comprime
+                        */
+
+                        let compressed =
+                            await compressCanvas(
+                                canvas
+                            );
+
+                        /*
+                        Se ainda estiver grande,
+                        reduz fisicamente.
+                        */
+
+                        let attempts = 0;
+
+                        while (
+                            getBase64Size(
+                                compressed
+                            ) >
+                                MAX_IMAGE_BYTES &&
+                            attempts < 4
+                        ) {
+                            attempts++;
+
+                            width =
+                                Math.round(
+                                    width *
+                                    0.80
+                                );
+
+                            height =
+                                Math.round(
+                                    height *
+                                    0.80
+                                );
+
+                            canvas =
+                                createProcessedCanvas(
+                                    img,
+                                    width,
+                                    height
+                                );
+
+                            compressed =
+                                await compressCanvas(
+                                    canvas
+                                );
+
+                            /*
+                            Libera memória do
+                            canvas anterior
+                            */
+
+                            canvas.width = 1;
+                            canvas.height = 1;
+                        }
+
+                        /*
+                        Segurança final
+                        */
+
+                        if (
+                            getBase64Size(
+                                compressed
+                            ) >
+                            MAX_IMAGE_BYTES
+                        ) {
+                            throw new Error(
+                                'Não foi possível reduzir a imagem para o tamanho permitido.'
+                            );
+                        }
+
+                        console.log(
+                            'Imagem processada:',
+                            Math.round(
+                                getBase64Size(
+                                    compressed
+                                ) / 1024
+                            ),
+                            'KB'
+                        );
+
+                        resolve(
+                            compressed
+                        );
+                    } catch (
+                        error
+                    ) {
+                        console.error(
+                            'Erro no processamento da imagem:',
+                            error
+                        );
+
+                        reject(
+                            error
+                        );
+                    }
+                };
+
+                img.src =
+                    reader.result as string;
+            };
+
+            reader.readAsDataURL(
+                file
+            );
+        }
+    );
+};
+
+
+/*
+=====================================================
+RECOMPRIMIR DATA URL EXISTENTE
+=====================================================
+*/
+
+const compressExistingDataUrl = (
+    dataUrl: string
+): Promise<string> => {
+    return new Promise(
+        (resolve, reject) => {
+
+            /*
+            Se não for Base64,
+            mantém a URL original.
+            */
+
+            if (
+                !dataUrl.startsWith(
+                    'data:image/'
+                )
+            ) {
+                resolve(
+                    dataUrl
+                );
+
+                return;
+            }
+
+            /*
+            Se já estiver pequena,
+            não processa novamente.
+            */
+
+            if (
+                getBase64Size(
+                    dataUrl
+                ) <=
+                MAX_IMAGE_BYTES
+            ) {
+                resolve(
+                    dataUrl
+                );
+
+                return;
+            }
+
+            const img =
+                new Image();
 
             img.onerror = () => {
                 reject(
                     new Error(
-                        'Erro ao carregar a imagem.'
+                        'Erro ao carregar imagem existente.'
                     )
                 );
             };
@@ -148,164 +635,34 @@ const processImageFile = (
                     let height =
                         img.naturalHeight;
 
-                    /*
-                    Redimensiona inicialmente
-                    */
-
-                    if (width > MAX_WIDTH) {
-                        height = Math.round(
-                            (height *
-                                MAX_WIDTH) /
-                                width
-                        );
-
-                        width = MAX_WIDTH;
-                    }
-
-                    /*
-                    Canvas
-                    */
-
-                    const canvas =
-                        document.createElement(
-                            'canvas'
-                        );
-
-                    canvas.width = width;
-                    canvas.height = height;
-
-                    const ctx =
-                        canvas.getContext(
-                            '2d'
-                        );
-
-                    if (!ctx) {
-                        reject(
-                            new Error(
-                                'Não foi possível criar o Canvas.'
-                            )
-                        );
-
-                        return;
-                    }
-
-                    /*
-                    Fundo branco.
-                    Isso evita problemas com imagens
-                    transparentes convertidas para JPEG.
-                    */
-
-                    ctx.fillStyle =
-                        '#ffffff';
-
-                    ctx.fillRect(
-                        0,
-                        0,
-                        width,
-                        height
-                    );
-
-                    /*
-                    Desenha imagem
-                    */
-
-                    ctx.drawImage(
-                        img,
-                        0,
-                        0,
-                        width,
-                        height
-                    );
-
-                    /*
-                    =============================================
-                    MARCA D'ÁGUA
-                    =============================================
-                    */
-
-                    const fontSize =
-                        Math.max(
-                            18,
-                            Math.round(
-                                width *
-                                    0.028
-                            )
-                        );
-
-                    const diagonal =
-                        Math.sqrt(
-                            width ** 2 +
-                                height ** 2
-                        );
-
-                    ctx.save();
-
-                    ctx.globalAlpha = 0.055;
-
-                    ctx.font = `700 ${fontSize}px Arial, sans-serif`;
-
-                    ctx.fillStyle =
-                        '#ffffff';
-
-                    ctx.textAlign =
-                        'center';
-
-                    ctx.textBaseline =
-                        'middle';
-
-                    ctx.shadowColor =
-                        'rgba(0,0,0,.25)';
-
-                    ctx.shadowBlur = 2;
-
-                    ctx.translate(
-                        width / 2,
-                        height / 2
-                    );
-
-                    ctx.rotate(
-                        -Math.PI / 6
-                    );
-
-                    for (
-                        let y = -diagonal;
-                        y <= diagonal;
-                        y +=
-                            fontSize * 4
+                    if (
+                        width >
+                        MAX_WIDTH
                     ) {
-                        for (
-                            let x = -diagonal;
-                            x <= diagonal;
-                            x +=
-                                fontSize * 8
-                        ) {
-                            ctx.fillText(
-                                'ateliemariadias',
-                                x,
-                                y
+                        height =
+                            Math.round(
+                                (
+                                    height *
+                                    MAX_WIDTH
+                                ) /
+                                width
                             );
-                        }
+
+                        width =
+                            MAX_WIDTH;
                     }
 
-                    ctx.restore();
-
-                    /*
-                    =============================================
-                    COMPRESSÃO
-                    =============================================
-                    */
+                    let canvas =
+                        createProcessedCanvas(
+                            img,
+                            width,
+                            height
+                        );
 
                     let compressed =
-                        await canvasToCompressedDataUrl(
-                            canvas,
-                            0.75
+                        await compressCanvas(
+                            canvas
                         );
-
-                    /*
-                    Se mesmo com qualidade mínima
-                    ainda estiver grande, reduz
-                    fisicamente a resolução.
-                    */
 
                     let attempts = 0;
 
@@ -314,136 +671,37 @@ const processImageFile = (
                             compressed
                         ) >
                             MAX_IMAGE_BYTES &&
-                        attempts < 3
+                        attempts < 4
                     ) {
                         attempts++;
 
-                        width = Math.round(
-                            width * 0.8
-                        );
-
-                        height = Math.round(
-                            height * 0.8
-                        );
-
-                        canvas.width =
-                            width;
-
-                        canvas.height =
-                            height;
-
-                        ctx.clearRect(
-                            0,
-                            0,
-                            width,
-                            height
-                        );
-
-                        ctx.fillStyle =
-                            '#ffffff';
-
-                        ctx.fillRect(
-                            0,
-                            0,
-                            width,
-                            height
-                        );
-
-                        ctx.drawImage(
-                            img,
-                            0,
-                            0,
-                            width,
-                            height
-                        );
-
-                        /*
-                        Reaplica marca d'água
-                        */
-
-                        const newFontSize =
-                            Math.max(
-                                16,
-                                Math.round(
-                                    width *
-                                        0.028
-                                )
+                        width =
+                            Math.round(
+                                width *
+                                0.80
                             );
 
-                        const newDiagonal =
-                            Math.sqrt(
-                                width ** 2 +
-                                    height ** 2
+                        height =
+                            Math.round(
+                                height *
+                                0.80
                             );
 
-                        ctx.save();
-
-                        ctx.globalAlpha =
-                            0.055;
-
-                        ctx.font = `700 ${newFontSize}px Arial, sans-serif`;
-
-                        ctx.fillStyle =
-                            '#ffffff';
-
-                        ctx.textAlign =
-                            'center';
-
-                        ctx.textBaseline =
-                            'middle';
-
-                        ctx.shadowColor =
-                            'rgba(0,0,0,.25)';
-
-                        ctx.shadowBlur = 2;
-
-                        ctx.translate(
-                            width / 2,
-                            height / 2
-                        );
-
-                        ctx.rotate(
-                            -Math.PI / 6
-                        );
-
-                        for (
-                            let y =
-                                -newDiagonal;
-                            y <=
-                            newDiagonal;
-                            y +=
-                                newFontSize *
-                                4
-                        ) {
-                            for (
-                                let x =
-                                    -newDiagonal;
-                                x <=
-                                newDiagonal;
-                                x +=
-                                    newFontSize *
-                                    8
-                            ) {
-                                ctx.fillText(
-                                    'ateliemariadias',
-                                    x,
-                                    y
-                                );
-                            }
-                        }
-
-                        ctx.restore();
+                        canvas =
+                            createProcessedCanvas(
+                                img,
+                                width,
+                                height
+                            );
 
                         compressed =
-                            await canvasToCompressedDataUrl(
-                                canvas,
-                                0.65
+                            await compressCanvas(
+                                canvas
                             );
-                    }
 
-                    /*
-                    Segurança final
-                    */
+                        canvas.width = 1;
+                        canvas.height = 1;
+                    }
 
                     if (
                         getBase64Size(
@@ -451,231 +709,29 @@ const processImageFile = (
                         ) >
                         MAX_IMAGE_BYTES
                     ) {
-                        reject(
-                            new Error(
-                                'Não foi possível comprimir a imagem o suficiente.'
-                            )
+                        throw new Error(
+                            'Imagem existente ainda está muito grande.'
                         );
-
-                        return;
                     }
 
-                    console.log(
-                        'Imagem processada:',
-                        Math.round(
-                            getBase64Size(
-                                compressed
-                            ) / 1024
-                        ),
-                        'KB'
+                    resolve(
+                        compressed
                     );
-
-                    resolve(compressed);
-                } catch (error) {
-                    reject(error);
+                } catch (
+                    error
+                ) {
+                    reject(
+                        error
+                    );
                 }
             };
 
             img.src =
-                reader.result as string;
-        };
-
-        reader.readAsDataURL(file);
-    });
-
-/*
-=====================================================
-RECOMPRIMIR DATA URL EXISTENTE
-=====================================================
-*/
-
-const compressExistingDataUrl = (
-    dataUrl: string
-): Promise<string> =>
-    new Promise((resolve, reject) => {
-        if (
-            !dataUrl.startsWith(
-                'data:image'
-            )
-        ) {
-            resolve(dataUrl);
-            return;
+                dataUrl;
         }
+    );
+};
 
-        /*
-        Se já estiver pequeno, não precisa
-        processar novamente.
-        */
-
-        if (
-            getBase64Size(dataUrl) <=
-            MAX_IMAGE_BYTES
-        ) {
-            resolve(dataUrl);
-            return;
-        }
-
-        const img = new Image();
-
-        img.onerror = () =>
-            reject(
-                new Error(
-                    'Erro ao carregar imagem existente.'
-                )
-            );
-
-        img.onload = async () => {
-            try {
-                let width =
-                    img.naturalWidth;
-
-                let height =
-                    img.naturalHeight;
-
-                if (
-                    width > MAX_WIDTH
-                ) {
-                    height =
-                        Math.round(
-                            (height *
-                                MAX_WIDTH) /
-                                width
-                        );
-
-                    width =
-                        MAX_WIDTH;
-                }
-
-                const canvas =
-                    document.createElement(
-                        'canvas'
-                    );
-
-                canvas.width =
-                    width;
-
-                canvas.height =
-                    height;
-
-                const ctx =
-                    canvas.getContext(
-                        '2d'
-                    );
-
-                if (!ctx) {
-                    reject(
-                        new Error(
-                            'Canvas indisponível.'
-                        )
-                    );
-
-                    return;
-                }
-
-                ctx.fillStyle =
-                    '#ffffff';
-
-                ctx.fillRect(
-                    0,
-                    0,
-                    width,
-                    height
-                );
-
-                ctx.drawImage(
-                    img,
-                    0,
-                    0,
-                    width,
-                    height
-                );
-
-                let compressed =
-                    await canvasToCompressedDataUrl(
-                        canvas,
-                        0.7
-                    );
-
-                let attempts = 0;
-
-                while (
-                    getBase64Size(
-                        compressed
-                    ) >
-                        MAX_IMAGE_BYTES &&
-                    attempts < 3
-                ) {
-                    attempts++;
-
-                    width = Math.round(
-                        width * 0.8
-                    );
-
-                    height = Math.round(
-                        height * 0.8
-                    );
-
-                    canvas.width =
-                        width;
-
-                    canvas.height =
-                        height;
-
-                    ctx.clearRect(
-                        0,
-                        0,
-                        width,
-                        height
-                    );
-
-                    ctx.fillStyle =
-                        '#ffffff';
-
-                    ctx.fillRect(
-                        0,
-                        0,
-                        width,
-                        height
-                    );
-
-                    ctx.drawImage(
-                        img,
-                        0,
-                        0,
-                        width,
-                        height
-                    );
-
-                    compressed =
-                        await canvasToCompressedDataUrl(
-                            canvas,
-                            0.6
-                        );
-                }
-
-                if (
-                    getBase64Size(
-                        compressed
-                    ) >
-                    MAX_IMAGE_BYTES
-                ) {
-                    reject(
-                        new Error(
-                            'Imagem existente ainda está muito grande.'
-                        )
-                    );
-
-                    return;
-                }
-
-                resolve(compressed);
-            } catch (error) {
-                reject(error);
-            }
-        };
-
-        img.src = dataUrl;
-    });
 
 /*
 =====================================================
@@ -688,9 +744,9 @@ function AdminPage() {
         useState<Product[]>([]);
 
     const [isEditing, setIsEditing] =
-        useState<Product['id'] | null>(
-            null
-        );
+        useState<
+            Product['id'] | null
+        >(null);
 
     const [itemToDelete, setItemToDelete] =
         useState<{
@@ -710,6 +766,7 @@ function AdminPage() {
     const [isSaving, setIsSaving] =
         useState(false);
 
+
     /*
     =============================================
     FORM
@@ -722,11 +779,14 @@ function AdminPage() {
         field: K,
         value: (typeof INITIAL_FORM)[K]
     ) => {
-        setFormData(prev => ({
-            ...prev,
-            [field]: value,
-        }));
+        setFormData(
+            prev => ({
+                ...prev,
+                [field]: value,
+            })
+        );
     };
+
 
     /*
     =============================================
@@ -734,108 +794,168 @@ function AdminPage() {
     =============================================
     */
 
-    const refreshProducts = async () => {
-        try {
-            const data =
-                await productService.getProducts();
+    const refreshProducts =
+        async () => {
+            try {
+                const data =
+                    await productService
+                        .getProducts();
 
-            setProducts(data);
-        } catch (error) {
-            console.error(
-                'Erro ao atualizar produtos:',
+                setProducts(
+                    data
+                );
+            } catch (
                 error
-            );
+            ) {
+                console.error(
+                    'Erro ao atualizar produtos:',
+                    error
+                );
 
-            toast.error(
-                'Erro ao carregar produtos.'
-            );
-        }
-    };
+                toast.error(
+                    'Erro ao carregar produtos.'
+                );
+            }
+        };
+
 
     useEffect(() => {
         refreshProducts();
     }, []);
 
+
     /*
     =============================================
-    UPLOAD
+    UPLOAD DAS IMAGENS
     =============================================
     */
 
-    const handleImageUpload = async (
-        e: React.ChangeEvent<HTMLInputElement>
-    ) => {
-        const files = Array.from(
-            e.target.files || []
-        );
+    const handleImageUpload =
+        async (
+            e: React.ChangeEvent<HTMLInputElement>
+        ) => {
 
-        if (!files.length) {
-            return;
-        }
-
-        if (
-            formData.images.length +
-                files.length >
-            MAX_IMAGES
-        ) {
-            toast.error(
-                'Você só pode adicionar no máximo 4 fotos por produto.'
-            );
-
-            e.target.value = '';
-
-            return;
-        }
-
-        try {
-            toast.loading(
-                'Comprimindo imagem...',
-                {
-                    id: 'image-processing',
-                }
-            );
-
-            const images =
-                await Promise.all(
-                    files.map(
-                        processImageFile
-                    )
+            const files =
+                Array.from(
+                    e.target.files ||
+                    []
                 );
 
-            setFormData(prev => ({
-                ...prev,
+            if (
+                !files.length
+            ) {
+                return;
+            }
 
-                images: [
-                    ...prev.images,
-                    ...images,
-                ].slice(
+            const remainingSlots =
+                MAX_IMAGES -
+                formData.images.length;
+
+            if (
+                remainingSlots <= 0
+            ) {
+                toast.error(
+                    'Você já adicionou o máximo de 4 fotos.'
+                );
+
+                e.target.value =
+                    '';
+
+                return;
+            }
+
+            const filesToProcess =
+                files.slice(
                     0,
-                    MAX_IMAGES
-                ),
-            }));
+                    remainingSlots
+                );
 
-            toast.success(
-                "Imagem comprimida e protegida com marca d'água!",
-                {
-                    id: 'image-processing',
+            if (
+                files.length >
+                remainingSlots
+            ) {
+                toast.error(
+                    `Só é possível adicionar mais ${remainingSlots} foto(s).`
+                );
+            }
+
+            try {
+                toast.loading(
+                    'Processando imagens...',
+                    {
+                        id:
+                            'image-processing',
+                    }
+                );
+
+                const processedImages:
+                    string[] = [];
+
+                /*
+                IMPORTANTE:
+                processa uma imagem por vez.
+                Isso reduz bastante o uso de
+                memória em celulares.
+                */
+
+                for (
+                    const file of
+                    filesToProcess
+                ) {
+                    const processed =
+                        await processImageFile(
+                            file
+                        );
+
+                    processedImages.push(
+                        processed
+                    );
                 }
-            );
-        } catch (error) {
-            console.error(
-                'Erro ao processar imagem:',
+
+                setFormData(
+                    prev => ({
+                        ...prev,
+
+                        images: [
+                            ...prev.images,
+                            ...processedImages,
+                        ].slice(
+                            0,
+                            MAX_IMAGES
+                        ),
+                    })
+                );
+
+                toast.success(
+                    "Imagem processada e protegida com marca d'água!",
+                    {
+                        id:
+                            'image-processing',
+                    }
+                );
+            } catch (
                 error
-            );
+            ) {
+                console.error(
+                    'Erro ao processar imagem:',
+                    error
+                );
 
-            toast.error(
-                'Não foi possível processar a imagem.',
-                {
-                    id: 'image-processing',
-                }
-            );
-        } finally {
-            e.target.value = '';
-        }
-    };
+                toast.error(
+                    error instanceof Error
+                        ? error.message
+                        : 'Não foi possível processar a imagem.',
+                    {
+                        id:
+                            'image-processing',
+                    }
+                );
+            } finally {
+                e.target.value =
+                    '';
+            }
+        };
+
 
     /*
     =============================================
@@ -846,16 +966,19 @@ function AdminPage() {
     const removeImage = (
         index: number
     ) => {
-        setFormData(prev => ({
-            ...prev,
+        setFormData(
+            prev => ({
+                ...prev,
 
-            images:
-                prev.images.filter(
-                    (_, i) =>
-                        i !== index
-                ),
-        }));
+                images:
+                    prev.images.filter(
+                        (_, i) =>
+                            i !== index
+                    ),
+            })
+        );
     };
+
 
     /*
     =============================================
@@ -872,7 +995,8 @@ function AdminPage() {
 
         setFormData({
             title:
-                product.title || '',
+                product.title ||
+                '',
 
             description:
                 product.description ||
@@ -883,7 +1007,8 @@ function AdminPage() {
                 CATEGORIES[0],
 
             price:
-                product.price || '',
+                product.price ||
+                '',
 
             measurements:
                 product.measurements ||
@@ -905,20 +1030,25 @@ function AdminPage() {
         });
     };
 
+
     /*
     =============================================
     CANCELAR
     =============================================
     */
 
-    const handleCancel = () => {
-        setIsEditing(null);
+    const handleCancel =
+        () => {
+            setIsEditing(
+                null
+            );
 
-        setFormData({
-            ...INITIAL_FORM,
-            images: [],
-        });
-    };
+            setFormData({
+                ...INITIAL_FORM,
+                images: [],
+            });
+        };
+
 
     /*
     =============================================
@@ -926,273 +1056,374 @@ function AdminPage() {
     =============================================
     */
 
-    const confirmDelete = async () => {
-        if (!itemToDelete) {
-            return;
-        }
+    const confirmDelete =
+        async () => {
+            if (
+                !itemToDelete
+            ) {
+                return;
+            }
 
-        try {
-            await productService.deleteProduct(
-                itemToDelete.id
-            );
+            try {
+                await productService
+                    .deleteProduct(
+                        itemToDelete.id
+                    );
 
-            await refreshProducts();
+                await refreshProducts();
 
-            setItemToDelete(null);
+                setItemToDelete(
+                    null
+                );
 
-            toast.success(
-                'Produto removido com sucesso!'
-            );
-        } catch (error) {
-            console.error(
-                'Erro ao excluir:',
+                toast.success(
+                    'Produto removido com sucesso!'
+                );
+            } catch (
                 error
-            );
+            ) {
+                console.error(
+                    'Erro ao excluir:',
+                    error
+                );
 
-            toast.error(
-                'Erro ao remover produto.'
-            );
-        }
-    };
+                toast.error(
+                    'Erro ao remover produto.'
+                );
+            }
+        };
+
 
     /*
     =============================================
-    SALVAR
+    SALVAR PRODUTO
     =============================================
     */
 
-    const handleSubmit = async (
-        e: React.FormEvent
-    ) => {
-        e.preventDefault();
+    const handleSubmit =
+        async (
+            e: React.FormEvent
+        ) => {
 
-        if (isSaving) {
-            return;
-        }
+            e.preventDefault();
 
-        if (
-            !formData.title.trim() ||
-            !formData.description.trim() ||
-            !formData.price.trim()
-        ) {
-            toast.error(
-                'Preencha todos os campos obrigatórios.'
-            );
+            if (
+                isSaving
+            ) {
+                return;
+            }
 
-            return;
-        }
-
-        if (
-            !formData.images.length
-        ) {
-            toast.error(
-                'Por favor, adicione pelo menos 1 foto para o produto.'
-            );
-
-            return;
-        }
-
-        setIsSaving(true);
-
-        try {
             /*
-            =============================================
-            GARANTIR QUE TODAS AS IMAGENS BASE64
-            ESTEJAM COMPRIMIDAS
-            =============================================
+            Validação
             */
 
-            const finalImages =
-                await Promise.all(
-                    formData.images.map(
-                        async image => {
+            if (
+                !formData.title.trim() ||
+                !formData.description.trim() ||
+                !formData.price.trim()
+            ) {
+                toast.error(
+                    'Preencha todos os campos obrigatórios.'
+                );
+
+                return;
+            }
+
+            if (
+                !formData.images.length
+            ) {
+                toast.error(
+                    'Por favor, adicione pelo menos 1 foto para o produto.'
+                );
+
+                return;
+            }
+
+            setIsSaving(
+                true
+            );
+
+            try {
+
+                /*
+                =============================================
+                GARANTIR QUE TODAS AS IMAGENS
+                ESTÃO COMPRIMIDAS
+                =============================================
+                */
+
+                const finalImages:
+                    string[] = [];
+
+                /*
+                Processamento sequencial.
+                Não usa Promise.all para evitar
+                sobrecarga de memória no celular.
+                */
+
+                for (
+                    const image of
+                    formData.images
+                ) {
+
+                    if (
+                        image.startsWith(
+                            'data:image/'
+                        )
+                    ) {
+                        const compressed =
+                            await compressExistingDataUrl(
+                                image
+                            );
+
+                        finalImages.push(
+                            compressed
+                        );
+                    } else {
+                        finalImages.push(
+                            image
+                        );
+                    }
+                }
+
+
+                /*
+                =============================================
+                SEGURANÇA EXTRA
+                =============================================
+                */
+
+                const totalBase64Bytes =
+                    finalImages.reduce(
+                        (
+                            total,
+                            image
+                        ) => {
+
                             if (
                                 image.startsWith(
-                                    'data:image'
+                                    'data:image/'
                                 )
                             ) {
-                                return compressExistingDataUrl(
-                                    image
+                                return (
+                                    total +
+                                    getBase64Size(
+                                        image
+                                    )
                                 );
                             }
 
-                            return image;
-                        }
-                    )
-                );
+                            return total;
+                        },
+                        0
+                    );
 
-            /*
-            =============================================
-            SEGURANÇA EXTRA
-            =============================================
-            */
 
-            const totalBase64Bytes =
-                finalImages.reduce(
-                    (total, image) => {
-                        if (
-                            image.startsWith(
-                                'data:image'
-                            )
-                        ) {
-                            return (
-                                total +
-                                getBase64Size(
-                                    image
-                                )
-                            );
-                        }
-
-                        return total;
-                    },
-                    0
-                );
-
-            console.log(
-                'Tamanho total das imagens:',
-                Math.round(
-                    totalBase64Bytes /
+                console.log(
+                    'Tamanho total das imagens:',
+                    Math.round(
+                        totalBase64Bytes /
                         1024
-                ),
-                'KB'
-            );
-
-            /*
-            4 imagens de aproximadamente
-            120 KB = ~480 KB binários.
-            Mesmo em Base64 fica confortavelmente
-            abaixo do limite do Firestore.
-            */
-
-            if (
-                totalBase64Bytes >
-                650 * 1024
-            ) {
-                throw new Error(
-                    'As imagens ainda estão muito grandes. Remova uma imagem e tente novamente.'
-                );
-            }
-
-            const productData = {
-                title:
-                    formData.title.trim(),
-
-                description:
-                    formData.description.trim(),
-
-                category:
-                    formData.category,
-
-                price:
-                    formData.price.trim(),
-
-                measurements:
-                    formData.measurements.trim(),
-
-                images:
-                    finalImages,
-
-                image:
-                    finalImages[0],
-
-                featured:
-                    formData.featured,
-            };
-
-            /*
-            =============================================
-            EDITAR
-            =============================================
-            */
-
-            if (
-                isEditing !== null
-            ) {
-                await productService.updateProduct(
-                    isEditing,
-                    productData
+                    ),
+                    'KB'
                 );
 
-                toast.success(
-                    'Produto atualizado com sucesso!'
-                );
-            }
-
-            /*
-            =============================================
-            NOVO
-            =============================================
-            */
-
-            else {
-                await productService.addProduct(
-                    productData
-                );
-
-                toast.success(
-                    'Produto cadastrado com sucesso!'
-                );
-            }
-
-            /*
-            =============================================
-            ATUALIZAR LISTA
-            =============================================
-            */
-
-            await refreshProducts();
-
-            handleCancel();
-        } catch (error) {
-            console.error(
-                'ERRO COMPLETO AO SALVAR PRODUTO:',
-                error
-            );
-
-            let message =
-                isEditing !== null
-                    ? 'Erro ao atualizar produto.'
-                    : 'Erro ao cadastrar produto.';
-
-            if (
-                error instanceof Error
-            ) {
-                console.error(
-                    'Mensagem:',
-                    error.message
-                );
 
                 /*
-                Mensagens específicas
+                Limite total
                 */
 
                 if (
-                    error.message.includes(
-                        'too large'
-                    ) ||
-                    error.message.includes(
-                        'large'
-                    )
+                    totalBase64Bytes >
+                    700 * 1024
                 ) {
-                    message =
-                        'As imagens ficaram grandes demais. Tente usar menos fotos.';
+                    throw new Error(
+                        'As imagens ainda estão muito grandes. Remova uma imagem e tente novamente.'
+                    );
                 }
+
+
+                /*
+                =============================================
+                DADOS DO PRODUTO
+                =============================================
+                */
+
+                const productData = {
+                    title:
+                        formData.title.trim(),
+
+                    description:
+                        formData.description.trim(),
+
+                    category:
+                        formData.category,
+
+                    price:
+                        formData.price.trim(),
+
+                    measurements:
+                        formData.measurements.trim(),
+
+                    images:
+                        finalImages,
+
+                    image:
+                        finalImages[0],
+
+                    featured:
+                        formData.featured,
+                };
+
+
+                console.log(
+                    'Produto que será enviado:',
+                    productData
+                );
+
+
+                /*
+                =============================================
+                EDITAR
+                =============================================
+                */
 
                 if (
-                    error.message.includes(
-                        'permission-denied'
-                    )
+                    isEditing !==
+                    null
                 ) {
-                    message =
-                        'O Firebase recusou a operação por permissão.';
-                }
-            }
 
-            toast.error(message);
-        } finally {
-            setIsSaving(false);
-        }
-    };
+                    await productService
+                        .updateProduct(
+                            isEditing,
+                            productData
+                        );
+
+                    toast.success(
+                        'Produto atualizado com sucesso!'
+                    );
+
+                }
+
+                /*
+                =============================================
+                NOVO PRODUTO
+                =============================================
+                */
+
+                else {
+
+                    await productService
+                        .addProduct(
+                            productData
+                        );
+
+                    toast.success(
+                        'Produto cadastrado com sucesso!'
+                    );
+                }
+
+
+                /*
+                =============================================
+                ATUALIZAR LISTA
+                =============================================
+                */
+
+                await refreshProducts();
+
+                handleCancel();
+
+            } catch (
+                error
+            ) {
+
+                console.error(
+                    'ERRO COMPLETO AO SALVAR PRODUTO:',
+                    error
+                );
+
+                let message =
+                    isEditing !==
+                    null
+                        ? 'Erro ao atualizar produto.'
+                        : 'Erro ao cadastrar produto.';
+
+
+                if (
+                    error instanceof Error
+                ) {
+
+                    console.error(
+                        'Mensagem:',
+                        error.message
+                    );
+
+                    /*
+                    Imagem grande
+                    */
+
+                    if (
+                        error.message
+                            .toLowerCase()
+                            .includes(
+                                'large'
+                            ) ||
+                        error.message
+                            .toLowerCase()
+                            .includes(
+                                'too large'
+                            )
+                    ) {
+                        message =
+                            'As imagens ficaram grandes demais. Tente usar menos fotos.';
+                    }
+
+
+                    /*
+                    Permissão Firebase
+                    */
+
+                    if (
+                        error.message
+                            .includes(
+                                'permission-denied'
+                            )
+                    ) {
+                        message =
+                            'O Firebase recusou a operação por permissão.';
+                    }
+
+
+                    /*
+                    Offline
+                    */
+
+                    if (
+                        error.message
+                            .toLowerCase()
+                            .includes(
+                                'offline'
+                            )
+                    ) {
+                        message =
+                            'Sem conexão com o Firebase. Verifique a internet e tente novamente.';
+                    }
+                }
+
+
+                toast.error(
+                    message
+                );
+
+            } finally {
+
+                setIsSaving(
+                    false
+                );
+            }
+        };
+
 
     /*
     =============================================
@@ -1203,15 +1434,19 @@ function AdminPage() {
     const filteredProducts =
         products.filter(
             product => {
+
                 const search =
-                    searchTerm.toLowerCase();
+                    searchTerm
+                        .toLowerCase();
 
                 const title =
-                    product.title?.toLowerCase() ||
+                    product.title
+                        ?.toLowerCase() ||
                     '';
 
                 const description =
-                    product.description?.toLowerCase() ||
+                    product.description
+                        ?.toLowerCase() ||
                     '';
 
                 const matchesSearch =
@@ -1235,38 +1470,47 @@ function AdminPage() {
             }
         );
 
+
     /*
     =============================================
     DESTAQUES
     =============================================
     */
 
-    const toggleFeatured = (
-        checked: boolean
-    ) => {
-        if (checked) {
-            const count =
-                products.filter(
-                    p =>
-                        p.featured &&
-                        p.id !==
-                            isEditing
-                ).length;
+    const toggleFeatured =
+        (
+            checked: boolean
+        ) => {
 
-            if (count >= 4) {
-                toast.error(
-                    'Já existem 4 produtos em destaque na página inicial.'
-                );
+            if (
+                checked
+            ) {
 
-                return;
+                const count =
+                    products.filter(
+                        p =>
+                            p.featured &&
+                            p.id !==
+                                isEditing
+                    ).length;
+
+                if (
+                    count >= 4
+                ) {
+                    toast.error(
+                        'Já existem 4 produtos em destaque na página inicial.'
+                    );
+
+                    return;
+                }
             }
-        }
 
-        updateForm(
-            'featured',
-            checked
-        );
-    };
+            updateForm(
+                'featured',
+                checked
+            );
+        };
+
 
     /*
     =============================================
@@ -1625,15 +1869,19 @@ function AdminPage() {
                     .btn-secondary {
                         flex: 1;
                     }
+
                 }
 
             `}</style>
+
 
             <h1 className="admin-page-title">
                 Painel do Administrador
             </h1>
 
+
             <div className="admin-order-container">
+
                 <Link
                     to="/admin/gerador-pedidos"
                     className="admin-order"
@@ -1641,7 +1889,9 @@ function AdminPage() {
                     🖼️ Gerar Comprovante de Pedido
                     (Imagem)
                 </Link>
+
             </div>
+
 
             <div className="admin-card">
 
@@ -1650,6 +1900,7 @@ function AdminPage() {
                         ? 'Editar Produto'
                         : 'Cadastrar Novo Produto'}
                 </h2>
+
 
                 <form
                     onSubmit={
@@ -1661,7 +1912,9 @@ function AdminPage() {
                     }}
                 >
 
+
                     <div>
+
                         <label className="admin-label">
                             Título do Produto *
                         </label>
@@ -1681,11 +1934,14 @@ function AdminPage() {
                             className="admin-input"
                             placeholder="Ex: Manta Piquet Bordada"
                         />
+
                     </div>
+
 
                     <div className="form-grid-two">
 
                         <div>
+
                             <label className="admin-label">
                                 Categoria *
                             </label>
@@ -1703,6 +1959,7 @@ function AdminPage() {
                                 }
                                 className="admin-input"
                             >
+
                                 {CATEGORIES.map(
                                     category => (
                                         <option
@@ -1719,10 +1976,14 @@ function AdminPage() {
                                         </option>
                                     )
                                 )}
+
                             </select>
+
                         </div>
 
+
                         <div>
+
                             <label className="admin-label">
                                 Preço (ex: R$ 150,00) *
                             </label>
@@ -1742,9 +2003,11 @@ function AdminPage() {
                                 className="admin-input"
                                 placeholder="R$ 0,00"
                             />
+
                         </div>
 
                     </div>
+
 
                     <div>
 
@@ -1768,6 +2031,7 @@ function AdminPage() {
                         />
 
                     </div>
+
 
                     <div>
 
@@ -1798,20 +2062,24 @@ function AdminPage() {
                             }}
                         />
 
+
                         <div
                             style={{
                                 display:
                                     'flex',
-                                gap: '.75rem',
+                                gap:
+                                    '.75rem',
                                 flexWrap:
                                     'wrap',
                             }}
                         >
+
                             {formData.images.map(
                                 (
                                     image,
                                     index
                                 ) => (
+
                                     <div
                                         className="image-preview"
                                         key={`${image}-${index}`}
@@ -1820,6 +2088,7 @@ function AdminPage() {
                                         {isImageUrl(
                                             image
                                         ) ? (
+
                                             <img
                                                 src={
                                                     image
@@ -1829,13 +2098,17 @@ function AdminPage() {
                                                     false
                                                 }
                                             />
+
                                         ) : (
+
                                             <div className="image-placeholder">
                                                 {
                                                     image
                                                 }
                                             </div>
+
                                         )}
+
 
                                         <button
                                             type="button"
@@ -1851,24 +2124,32 @@ function AdminPage() {
                                         </button>
 
                                     </div>
+
                                 )
                             )}
+
                         </div>
 
+
                         <div className="info-box">
+
                             🔒{' '}
+
                             <strong>
                                 Proteção ativada:
                             </strong>{' '}
+
                             as imagens recebem
                             marca d'água e são
                             automaticamente
                             comprimidas para
                             funcionar também
                             em celulares.
+
                         </div>
 
                     </div>
+
 
                     <div>
 
@@ -1898,13 +2179,15 @@ function AdminPage() {
 
                     </div>
 
+
                     <div
                         style={{
                             display:
                                 'flex',
                             alignItems:
                                 'center',
-                            gap: '.6rem',
+                            gap:
+                                '.6rem',
                         }}
                     >
 
@@ -1916,8 +2199,7 @@ function AdminPage() {
                             }
                             onChange={e =>
                                 toggleFeatured(
-                                    e.target
-                                        .checked
+                                    e.target.checked
                                 )
                             }
                             style={{
@@ -1929,6 +2211,7 @@ function AdminPage() {
                                     '#A35858',
                             }}
                         />
+
 
                         <label
                             htmlFor="featured"
@@ -1952,11 +2235,13 @@ function AdminPage() {
 
                     </div>
 
+
                     <div
                         style={{
                             display:
                                 'flex',
-                            gap: '.8rem',
+                            gap:
+                                '.8rem',
                             marginTop:
                                 '.5rem',
                         }}
@@ -1969,16 +2254,18 @@ function AdminPage() {
                                 isSaving
                             }
                         >
+
                             {isSaving
                                 ? 'Salvando...'
-                                : isEditing !==
-                                  null
+                                : isEditing !== null
                                 ? 'Salvar Alterações'
                                 : 'Cadastrar Produto'}
+
                         </button>
 
-                        {isEditing !==
-                            null && (
+
+                        {isEditing !== null && (
+
                             <button
                                 type="button"
                                 onClick={
@@ -1991,6 +2278,7 @@ function AdminPage() {
                             >
                                 Cancelar
                             </button>
+
                         )}
 
                     </div>
@@ -1998,6 +2286,7 @@ function AdminPage() {
                 </form>
 
             </div>
+
 
             <div
                 style={{
@@ -2020,7 +2309,8 @@ function AdminPage() {
                             '#2D2323',
                         fontWeight:
                             600,
-                        margin: 0,
+                        margin:
+                            0,
                     }}
                 >
                     Produtos Cadastrados (
@@ -2032,6 +2322,7 @@ function AdminPage() {
                 </h2>
 
             </div>
+
 
             <div className="filter-bar">
 
@@ -2057,6 +2348,7 @@ function AdminPage() {
 
                 </div>
 
+
                 <div>
 
                     <label className="admin-label">
@@ -2069,8 +2361,7 @@ function AdminPage() {
                         }
                         onChange={e =>
                             setSelectedCategory(
-                                e.target
-                                    .value
+                                e.target.value
                             )
                         }
                         className="admin-input"
@@ -2082,6 +2373,7 @@ function AdminPage() {
 
                         {CATEGORIES.map(
                             category => (
+
                                 <option
                                     key={
                                         category
@@ -2094,6 +2386,7 @@ function AdminPage() {
                                         category
                                     }
                                 </option>
+
                             )
                         )}
 
@@ -2103,11 +2396,13 @@ function AdminPage() {
 
             </div>
 
+
             <div
                 style={{
                     display:
                         'grid',
-                    gap: '.8rem',
+                    gap:
+                        '.8rem',
                 }}
             >
 
@@ -2124,6 +2419,7 @@ function AdminPage() {
                                 '';
 
                             return (
+
                                 <div
                                     key={String(
                                         product.id
@@ -2144,7 +2440,8 @@ function AdminPage() {
                                                 'none',
                                             color:
                                                 'inherit',
-                                            flex: 1,
+                                            flex:
+                                                1,
                                             minWidth:
                                                 0,
                                         }}
@@ -2184,11 +2481,14 @@ function AdminPage() {
                                                         '1px solid #F0E3E3',
                                                 }}
                                             >
-                                                {mainImage ||
-                                                    '🖼️'}
+                                                {
+                                                    mainImage ||
+                                                    '🖼️'
+                                                }
                                             </div>
 
                                         )}
+
 
                                         <div
                                             className="product-info"
@@ -2206,16 +2506,19 @@ function AdminPage() {
                                                     '⭐'}
                                             </strong>
 
+
                                             <span>
                                                 {
                                                     product.category
                                                 }{' '}
                                                 •{' '}
+
                                                 <span className="product-price">
                                                     {
                                                         product.price
                                                     }
                                                 </span>{' '}
+
                                                 {product.measurements &&
                                                     `• Medidas: ${product.measurements}`}
                                             </span>
@@ -2223,6 +2526,7 @@ function AdminPage() {
                                         </div>
 
                                     </Link>
+
 
                                     <div className="product-actions">
 
@@ -2238,13 +2542,16 @@ function AdminPage() {
                                             ✏️ Editar
                                         </button>
 
+
                                         <button
                                             type="button"
                                             onClick={() =>
                                                 setItemToDelete(
                                                     {
-                                                        id: product.id,
-                                                        title: product.title,
+                                                        id:
+                                                            product.id,
+                                                        title:
+                                                            product.title,
                                                     }
                                                 )
                                             }
@@ -2256,6 +2563,7 @@ function AdminPage() {
                                     </div>
 
                                 </div>
+
                             );
                         }
                     )
@@ -2272,6 +2580,7 @@ function AdminPage() {
                 )}
 
             </div>
+
 
             {itemToDelete && (
 
@@ -2290,6 +2599,7 @@ function AdminPage() {
                             ⚠️
                         </div>
 
+
                         <h3
                             style={{
                                 fontSize:
@@ -2304,6 +2614,7 @@ function AdminPage() {
                         >
                             Excluir peça?
                         </h3>
+
 
                         <p
                             style={{
@@ -2340,6 +2651,7 @@ function AdminPage() {
                             ser desfeita.
                         </p>
 
+
                         <div className="modal-actions">
 
                             <button
@@ -2353,6 +2665,7 @@ function AdminPage() {
                             >
                                 Cancelar
                             </button>
+
 
                             <button
                                 type="button"
