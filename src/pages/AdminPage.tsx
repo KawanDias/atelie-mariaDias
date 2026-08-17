@@ -185,7 +185,7 @@ const applyWatermark = (
 
     ctx.save();
 
-    ctx.globalAlpha = 0.055;
+    ctx.globalAlpha = 0.18;
 
     ctx.font =
         `700 ${fontSize}px Arial, sans-serif`;
