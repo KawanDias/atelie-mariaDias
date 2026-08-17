@@ -30,35 +30,49 @@ export function AdminOrderGenerator() {
     };
 
     return (
-        <div style={{ padding: '2.5rem 1.5rem', maxWidth: '1280px', margin: '0 auto', fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: '#2D2323' }}>
+        <div style={{ 
+            padding: '1.5rem 1rem', 
+            maxWidth: '1280px', 
+            margin: '0 auto', 
+            fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif", 
+            color: '#2D2323',
+            boxSizing: 'border-box' 
+        }}>
             
             {/* Cabeçalho da Página */}
-            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-                <h1 style={{ fontSize: '2rem', color: '#2D2323', margin: '0 0 0.5rem 0', fontWeight: 700 }}>
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <h1 style={{ fontSize: 'clamp(1.4rem, 4vw, 2rem)', color: '#2D2323', margin: '0 0 0.5rem 0', fontWeight: 700 }}>
                     ✨ Gerador de Comprovante de Pedido
                 </h1>
-                <p style={{ color: '#7A6262', margin: 0, fontSize: '0.95rem' }}>
+                <p style={{ color: '#7A6262', margin: 0, fontSize: '0.9rem' }}>
                     Preencha as informações do pedido e gere uma imagem bonita para enviar ao cliente.
                 </p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '2.5rem', alignItems: 'start' }}>
+            {/* Grid principal do Admin (Formulário x Preview) */}
+            <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+                gap: '1.5rem', 
+                alignItems: 'start' 
+            }}>
                 
                 {/* FORMULÁRIO DE PREENCHIMENTO */}
                 <div style={{ 
                     background: '#FFFFFF', 
-                    padding: '2rem', 
+                    padding: '1.5rem', 
                     borderRadius: '20px', 
                     border: '1px solid #F2E6E6', 
-                    boxShadow: '0 10px 30px rgba(163, 88, 88, 0.05)' 
+                    boxShadow: '0 10px 30px rgba(163, 88, 88, 0.05)',
+                    boxSizing: 'border-box'
                 }}>
-                    <h3 style={{ margin: '0 0 1.5rem 0', color: '#A35858', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h3 style={{ margin: '0 0 1.25rem 0', color: '#A35858', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         📝 Dados do Pedido
                     </h3>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#524343', marginBottom: '0.4rem' }}>
                                     Nome do Cliente
@@ -83,7 +97,7 @@ export function AdminOrderGenerator() {
                             </div>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#524343', marginBottom: '0.4rem' }}>
                                     Nome na Peça
@@ -162,7 +176,8 @@ export function AdminOrderGenerator() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '0.6rem'
+                                gap: '0.6rem',
+                                width: '100%'
                             }}
                         >
                             📸 Baixar Imagem (PNG)
@@ -171,7 +186,7 @@ export function AdminOrderGenerator() {
                 </div>
 
                 {/* PRÉ-VISUALIZAÇÃO DO CARTÃO DO PEDIDO (CANVAS EXPORTÁVEL) */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', width: '100%' }}>
                     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#7A6262', textTransform: 'uppercase', letterSpacing: '1px' }}>
                         Pré-visualização da Imagem
                     </span>
@@ -179,15 +194,17 @@ export function AdminOrderGenerator() {
                     <div 
                         ref={cardRef} 
                         style={{ 
-                            width: '440px', 
+                            width: '100%', 
+                            maxWidth: '440px', 
                             backgroundColor: '#FAF5F3', 
                             borderRadius: '24px',
-                            padding: '24px', 
+                            padding: '20px', 
                             boxSizing: 'border-box',
                             color: '#2D2323',
                             boxShadow: '0 12px 30px rgba(0,0,0,0.08)',
                             border: '1px solid #EEDADA',
-                            position: 'relative'
+                            position: 'relative',
+                            overflowWrap: 'break-word'
                         }}
                     >
                         {/* Topo / Marca */}
@@ -209,7 +226,9 @@ export function AdminOrderGenerator() {
                                 padding: '4px 16px', 
                                 borderRadius: '20px', 
                                 fontSize: '0.85rem', 
-                                fontWeight: 600 
+                                fontWeight: 600,
+                                maxWidth: '100%',
+                                wordBreak: 'break-word'
                             }}>
                                 Pedido: {clientName}
                             </div>
@@ -219,7 +238,7 @@ export function AdminOrderGenerator() {
                         <div style={{ 
                             backgroundColor: '#FFFFFF', 
                             borderRadius: '16px', 
-                            padding: '16px', 
+                            padding: '14px', 
                             textAlign: 'center', 
                             marginBottom: '16px',
                             border: '1px solid #EEDADA',
@@ -228,40 +247,40 @@ export function AdminOrderGenerator() {
                             <span style={{ fontSize: '0.75rem', color: '#7A6262', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px' }}>
                                 Categoria
                             </span>
-                            <h2 style={{ margin: 0, color: '#A35858', fontSize: '1.4rem', fontWeight: 700 }}>
+                            <h2 style={{ margin: 0, color: '#A35858', fontSize: '1.25rem', fontWeight: 700, wordBreak: 'break-word' }}>
                                 {categoryTitle}
                             </h2>
                         </div>
 
                         {/* Grid Nome & Especificações */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                             <div style={cardBlockStyle}>
                                 <span style={cardBlockTitleStyle}>Nome na Peça</span>
-                                <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#2D2323', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: '1.4' }}>
+                                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#2D2323', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: '1.4', wordBreak: 'break-word' }}>
                                     {personName}
                                 </p>
                             </div>
 
                             <div style={cardBlockStyle}>
                                 <span style={cardBlockTitleStyle}>Especificações</span>
-                                <p style={{ margin: 0, fontSize: '0.8rem', color: '#524343', whiteSpace: 'pre-line', lineHeight: '1.4' }}>
+                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#524343', whiteSpace: 'pre-line', lineHeight: '1.4', wordBreak: 'break-word' }}>
                                     {specifications}
                                 </p>
                             </div>
                         </div>
 
                         {/* Grid Itens & Valor Total */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                             <div style={cardBlockStyle}>
                                 <span style={cardBlockTitleStyle}>Itens / Qtd.</span>
-                                <p style={{ margin: 0, fontSize: '0.8rem', color: '#524343', whiteSpace: 'pre-line', lineHeight: '1.4' }}>
+                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#524343', whiteSpace: 'pre-line', lineHeight: '1.4', wordBreak: 'break-word' }}>
                                     {unitValues}
                                 </p>
                             </div>
 
                             <div style={{ ...cardBlockStyle, backgroundColor: '#FFF5F5', borderColor: '#F2D6D6', justifyContent: 'center' }}>
                                 <span style={{ ...cardBlockTitleStyle, color: '#A35858' }}>Valor Total</span>
-                                <p style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#A35858', textAlign: 'center' }}>
+                                <p style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#A35858', textAlign: 'center' }}>
                                     R$ {totalValue}
                                 </p>
                             </div>
@@ -272,15 +291,16 @@ export function AdminOrderGenerator() {
                             backgroundColor: '#A35858', 
                             color: '#FFFFFF', 
                             borderRadius: '12px', 
-                            padding: '10px 14px', 
+                            padding: '10px 12px', 
                             textAlign: 'center', 
-                            fontSize: '0.88rem', 
+                            fontSize: '0.85rem', 
                             fontWeight: 600, 
-                            marginBottom: '20px',
+                            marginBottom: '16px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '0.5rem'
+                            gap: '0.4rem',
+                            flexWrap: 'wrap'
                         }}>
                             🗓️ Entrega prevista: {deliveryDate}
                         </div>
@@ -291,23 +311,24 @@ export function AdminOrderGenerator() {
                             alignItems: 'center', 
                             justifyContent: 'space-between', 
                             paddingTop: '12px', 
-                            borderTop: '1px dashed #EEDADA'
+                            borderTop: '1px dashed #EEDADA',
+                            gap: '8px'
                         }}>
-                            <div>
-                                <span style={{ fontSize: '0.7rem', color: '#7A6262', display: 'block', textTransform: 'uppercase' }}>
+                            <div style={{ minWidth: 0 }}>
+                                <span style={{ fontSize: '0.68rem', color: '#7A6262', display: 'block', textTransform: 'uppercase' }}>
                                     Siga no Instagram
                                 </span>
-                                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#A35858' }}>
+                                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#A35858', wordBreak: 'break-all' }}>
                                     {instagram}
                                 </span>
                             </div>
 
                             {qrCodeUrl && (
-                                <div style={{ background: '#FFFFFF', padding: '4px', borderRadius: '8px', border: '1px solid #EEDADA' }}>
+                                <div style={{ background: '#FFFFFF', padding: '4px', borderRadius: '8px', border: '1px solid #EEDADA', flexShrink: 0 }}>
                                     <img 
                                         src={qrCodeUrl} 
                                         alt="QR Code Instagram" 
-                                        style={{ width: '52px', height: '52px', display: 'block', borderRadius: '4px' }}
+                                        style={{ width: '48px', height: '48px', display: 'block', borderRadius: '4px' }}
                                     />
                                 </div>
                             )}
@@ -337,21 +358,21 @@ const inputStyle: React.CSSProperties = {
 const cardBlockStyle: React.CSSProperties = {
     backgroundColor: '#FFFFFF',
     borderRadius: '12px',
-    padding: '12px',
+    padding: '10px',
     border: '1px solid #EEDADA',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '85px',
+    minHeight: '80px',
     boxSizing: 'border-box'
 };
 
 const cardBlockTitleStyle: React.CSSProperties = {
-    fontSize: '0.7rem',
+    fontSize: '0.68rem',
     fontWeight: 700,
     color: '#7A6262',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
-    marginBottom: '6px',
+    marginBottom: '4px',
     display: 'block'
 };
 
