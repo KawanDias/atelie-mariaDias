@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProducts } from '../services/productService';
+import hotToast from 'react-hot-toast'; // Opcional, se usar toast
+import { productService } from '../services/productService'; // Certifique-se do caminho
 import { useFavorites } from '../contexts/FavoritesContext';
 import type { Product } from '../types';
 
@@ -14,12 +15,13 @@ export function ProductPage() {
     useEffect(() => {
         async function fetchProduct() {
             try {
-                const products = await getProducts();
+                const products = await productService.getProducts();
                 // Comparação segura convertendo ambos os IDs para String
                 const found = products.find((p) => String(p.id) === String(id));
                 setProduct(found || null);
             } catch (error) {
                 console.error("Erro ao carregar produto:", error);
+                hotToast.error("Erro ao carregar os detalhes do produto.");
             } finally {
                 setLoading(false);
             }
@@ -93,6 +95,13 @@ export function ProductPage() {
 
     const mainImg = images[currentImageIndex] || '';
     const isUrl = mainImg.startsWith('http') || mainImg.startsWith('data:');
+
+    // FORMATAÇÃO DO PREÇO CORRIGIDA
+    const formattedPrice = typeof product.price === 'number'
+        ? `R$ ${(product.price as number).toFixed(2).replace('.', ',')}` // Correção com 'as number'
+        : String(product.price).includes('R$') 
+            ? product.price 
+            : `R$ ${product.price}`;
 
     return (
         <div style={{ padding: '2.5rem 1.25rem 4rem 1.25rem', maxWidth: '1020px', margin: '0 auto' }}>
@@ -308,7 +317,7 @@ export function ProductPage() {
                     </h1>
 
                     <p style={{ fontSize: '1.6rem', fontWeight: 700, color: '#A35858', margin: '0 0 1.2rem 0' }}>
-                        {product.price}
+                        {formattedPrice}
                     </p>
 
                     {/* Exibição das Medidas */}
