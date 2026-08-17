@@ -123,8 +123,44 @@ export async function getProducts(): Promise<Product[]> {
                         'string'
                             ? data.measurements
                             : '',
-                };
+
+                    // Mantém a data de criação
+                    // para ordenar os produtos.
+                    createdAt:
+                        data.createdAt ?? null,
+                } as Product;
             });
+
+        // =====================================================
+        // ORDENAR PRODUTOS
+        // =====================================================
+        // Mais antigo → mais novo.
+        //
+        // Assim:
+        // Produto antigo
+        // Produto antigo
+        // Produto antigo
+        // Produto novo ← fica no final
+        //
+        // Produtos antigos que não possuem createdAt
+        // recebem timestamp 0 e permanecem no início.
+        // =====================================================
+
+        products.sort((a, b) => {
+            const aCreatedAt =
+                (a as any).createdAt;
+
+            const bCreatedAt =
+                (b as any).createdAt;
+
+            const aTime =
+                aCreatedAt?.toMillis?.() ?? 0;
+
+            const bTime =
+                bCreatedAt?.toMillis?.() ?? 0;
+
+            return aTime - bTime;
+        });
 
         return products;
 
@@ -161,6 +197,7 @@ export async function saveProducts(
                 productRef,
                 {
                     title: product.title,
+
                     description:
                         product.description,
 
@@ -182,6 +219,16 @@ export async function saveProducts(
 
                     measurements:
                         product.measurements ?? '',
+
+                    // Produtos padrão recebem uma data
+                    // somente se ainda não possuírem uma.
+                    ...(product as any).createdAt
+                        ? {
+                              createdAt:
+                                  (product as any)
+                                      .createdAt,
+                          }
+                        : {},
                 },
                 {
                     merge: true,
@@ -208,7 +255,8 @@ export async function addProduct(
 ): Promise<Product> {
     try {
         const dataToAdd = {
-            title: newProduct.title,
+            title:
+                newProduct.title,
 
             description:
                 newProduct.description,
@@ -216,7 +264,8 @@ export async function addProduct(
             category:
                 newProduct.category,
 
-            price: newProduct.price,
+            price:
+                newProduct.price,
 
             images:
                 newProduct.images ?? [],
@@ -231,6 +280,13 @@ export async function addProduct(
 
             measurements:
                 newProduct.measurements ?? '',
+
+            // =================================================
+            // DATA DE CRIAÇÃO
+            // =================================================
+            // É isso que permite identificar a ordem
+            // correta dos produtos.
+            // =================================================
 
             createdAt:
                 serverTimestamp(),
@@ -251,7 +307,8 @@ export async function addProduct(
         return {
             id: docRef.id,
 
-            title: dataToAdd.title,
+            title:
+                dataToAdd.title,
 
             description:
                 dataToAdd.description,
@@ -259,7 +316,8 @@ export async function addProduct(
             category:
                 dataToAdd.category,
 
-            price: dataToAdd.price,
+            price:
+                dataToAdd.price,
 
             images:
                 dataToAdd.images,
@@ -272,7 +330,10 @@ export async function addProduct(
 
             measurements:
                 dataToAdd.measurements,
-        };
+
+            createdAt:
+                dataToAdd.createdAt,
+        } as Product;
 
     } catch (error) {
         console.error(
@@ -347,6 +408,11 @@ export async function updateProduct(
                 measurements:
                     updatedData.measurements,
             }),
+
+            // IMPORTANTE:
+            // Não alteramos createdAt ao editar.
+            // Assim o produto continua na posição
+            // correspondente à data em que foi cadastrado.
         };
 
         await updateDoc(
