@@ -5,6 +5,8 @@ import type { Product, ProductCategory } from '../types';
 import { productService } from '../services/productService';
 import { mockProducts } from '../data/products';
 
+
+
 // Categorias centralizadas
 const CATEGORIES: ProductCategory[] = [
     'Enxoval de Bebê',
@@ -392,6 +394,26 @@ function AdminPage() {
             `}</style>
 
             <h1 className="admin-page-title">Painel do Administrador</h1>
+
+            <div style={{ margin: '1.5rem 0 1rem 15.2rem' }}>
+                <Link 
+                    to="/admin/gerador-pedidos" 
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        background: '#A35858',
+                        color: '#ffffff',
+                        padding: '0.8rem 1.4rem',
+                        borderRadius: '12px',
+                        textDecoration: 'none',
+                        fontWeight: 600,
+                        boxShadow: '0 4px 12px rgba(163, 88, 88, 0.2)'
+                    }}
+                >
+                    🖼️ Gerar Comprovante de Pedido (Imagem)
+                </Link>
+            </div>
 
             {/* Formulário de Cadastro / Edição */}
             <div className="admin-card">

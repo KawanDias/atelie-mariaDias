@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
 import FavoritesPage from './pages/FavoritesPage';
 import RepairsPage from './pages/RepairsPage';
+import { AdminOrderGenerator } from './pages/AdminOrderGenerator';
 
 function App() {
     return (
@@ -45,6 +46,7 @@ function App() {
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/favoritos" element={<FavoritesPage />} />
                     <Route path="/consertos" element={<RepairsPage />} />
+                    <Route path="/admin/gerador-pedidos" element={<AdminOrderGenerator />} />
                 </Routes>
             </main>
 
