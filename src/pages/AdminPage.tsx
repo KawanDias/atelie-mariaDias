@@ -395,9 +395,27 @@ function AdminPage() {
 
             <h1 className="admin-page-title">Painel do Administrador</h1>
 
-            <div style={{ margin: '1.5rem 0 1rem 15.2rem' }}>
+            <div className="admin-order-btn-container">
+    <style>{`
+        .admin-order-btn-container {
+            margin: 1.5rem 0 1rem 15.2rem;
+        }
+        @media (max-width: 768px) {
+            .admin-order-btn-container {
+                margin: 1rem;
+            }
+            .admin-order-btn {
+                display: flex !important;
+                width: 100%;
+                justify-content: center;
+                box-sizing: border-box;
+                text-align: center;
+            }
+        }
+    `}</style>
                 <Link 
                     to="/admin/gerador-pedidos" 
+                    className="admin-order-btn"
                     style={{
                         display: 'inline-flex',
                         alignItems: 'center',
