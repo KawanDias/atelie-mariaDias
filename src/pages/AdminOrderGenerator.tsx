@@ -5,15 +5,15 @@ export function AdminOrderGenerator() {
     const cardRef = useRef<HTMLDivElement>(null);
 
     // Estados do Formulário
-    const [clientName, setClientName] = useState('Valdineia');
-    const [categoryTitle, setCategoryTitle] = useState('Bordados Personalizados');
-    const [personName, setPersonName] = useState('Joaquim Miguel');
-    const [specifications, setSpecifications] = useState('• Bordado: Nome sobreposto\n• Tamanho 1: 8,5 x 17 cm\n• Tamanho 2: 9 x 18 cm');
-    const [unitValues, setUnitValues] = useState('4x Item 1: R$ 25,00\n1x Item 2: R$ 30,00');
-    const [totalValue, setTotalValue] = useState('130,00');
-    const [deliveryDate, setDeliveryDate] = useState('18 de Agosto');
+    const [clientName, setClientName] = useState('');
+    const [categoryTitle, setCategoryTitle] = useState('');
+    const [personName, setPersonName] = useState('');
+    const [specifications, setSpecifications] = useState('');
+    const [unitValues, setUnitValues] = useState('');
+    const [totalValue, setTotalValue] = useState('');
+    const [deliveryDate, setDeliveryDate] = useState('');
     const [instagram, setInstagram] = useState('@atelie.mariadias');
-    const [qrCodeUrl, setQrCodeUrl] = useState('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://instagram.com/atelie.mariadias');
+   
 
     // Função para baixar a imagem em alta qualidade
     const handleDownloadImage = async () => {
@@ -322,18 +322,7 @@ export function AdminOrderGenerator() {
                                     {instagram}
                                 </span>
                             </div>
-
-                            {qrCodeUrl && (
-                                <div style={{ background: '#FFFFFF', padding: '4px', borderRadius: '8px', border: '1px solid #EEDADA', flexShrink: 0 }}>
-                                    <img 
-                                        src={qrCodeUrl} 
-                                        alt="QR Code Instagram" 
-                                        style={{ width: '48px', height: '48px', display: 'block', borderRadius: '4px' }}
-                                    />
-                                </div>
-                            )}
                         </div>
-
                     </div>
                 </div>
 

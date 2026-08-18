@@ -7,12 +7,11 @@ import { Link } from 'react-router-dom';
 import type { Product } from '../types';
 
 export function FavoritesPage() {
-    const { favorites } = useFavorites();
+    const { favorites, syncFavorites } = useFavorites();
     const { user } = useAuth();
     const [favoriteProducts, setFavoriteProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Identifica o ID do usuário logado
     const userId = user ? ((user as any).uid || (user as any).id) as string : null;
 
     useEffect(() => {
@@ -26,9 +25,18 @@ export function FavoritesPage() {
             try {
                 setLoading(true);
                 const allProducts = await getProducts();
-                // Filtra convertendo os IDs de forma segura para String
+                
+                // Filtra apenas produtos válidos no catálogo
                 const favorited = allProducts.filter((p) => favorites.includes(String(p.id)));
                 setFavoriteProducts(favorited);
+
+                // IDs válidos correspondentes
+                const validIds = favorited.map((p) => String(p.id));
+
+                // Se houver IDs salvos que não existem mais no catálogo, faz a limpeza silenciosa
+                if (validIds.length !== favorites.length) {
+                    await syncFavorites(validIds);
+                }
             } catch (error) {
                 console.error("Erro ao carregar favoritos:", error);
             } finally {
@@ -37,7 +45,7 @@ export function FavoritesPage() {
         }
 
         loadFavorites();
-    }, [favorites, userId]);
+    }, [favorites.length, userId]);
 
     if (loading) {
         return (

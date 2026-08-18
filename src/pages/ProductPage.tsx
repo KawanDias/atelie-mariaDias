@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import hotToast from 'react-hot-toast'; // Opcional, se usar toast
-import { productService } from '../services/productService'; // Certifique-se do caminho
+import hotToast from 'react-hot-toast';
+import { productService } from '../services/productService';
 import { useFavorites } from '../contexts/FavoritesContext';
 import type { Product } from '../types';
+import { ProductLightbox } from '../components/ProductLightbox';
 
 export function ProductPage() {
     const { id } = useParams<{ id: string }>();
@@ -11,12 +12,12 @@ export function ProductPage() {
     const [loading, setLoading] = useState(true);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const { isFavorite, toggleFavorite } = useFavorites();
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
     useEffect(() => {
         async function fetchProduct() {
             try {
                 const products = await productService.getProducts();
-                // Comparação segura convertendo ambos os IDs para String
                 const found = products.find((p) => String(p.id) === String(id));
                 setProduct(found || null);
             } catch (error) {
@@ -78,7 +79,6 @@ export function ProductPage() {
     const productIdStr = String(product.id);
     const fav = isFavorite(productIdStr);
 
-    // Compatibilidade com array de imagens ou imagem única antiga
     const images: string[] = (product as any).images 
         ? (product as any).images 
         : ((product as any).image ? [(product as any).image] : []);
@@ -96,9 +96,8 @@ export function ProductPage() {
     const mainImg = images[currentImageIndex] || '';
     const isUrl = mainImg.startsWith('http') || mainImg.startsWith('data:');
 
-    // FORMATAÇÃO DO PREÇO CORRIGIDA
     const formattedPrice = typeof product.price === 'number'
-        ? `R$ ${(product.price as number).toFixed(2).replace('.', ',')}` // Correção com 'as number'
+        ? `R$ ${(product.price as number).toFixed(2).replace('.', ',')}`
         : String(product.price).includes('R$') 
             ? product.price 
             : `R$ ${product.price}`;
@@ -241,7 +240,8 @@ export function ProductPage() {
                             <img 
                                 src={mainImg} 
                                 alt={product.title} 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                onClick={() => setIsLightboxOpen(true)}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} 
                             />
                         ) : (
                             <span style={{ fontSize: '4.5rem' }}>{mainImg || '🖼️'}</span>
@@ -381,6 +381,15 @@ export function ProductPage() {
                     </div>
                 </div>
             </div>
+
+            {/* LIGHTBOX MODAL */}
+            <ProductLightbox
+                images={images}
+                currentIndex={currentImageIndex}
+                isOpen={isLightboxOpen}
+                onClose={() => setIsLightboxOpen(false)}
+                onSelectImage={(index) => setCurrentImageIndex(index)}
+            />
         </div>
     );
 }
