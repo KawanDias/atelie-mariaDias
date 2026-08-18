@@ -102,7 +102,7 @@ function RepairsPage() {
             {/* Cabeçalho */}
             <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
                 <h2 style={{ fontSize: '2.1rem', color: '#2D2323', fontWeight: 700, marginBottom: '0.6rem' }}>
-                    🪡 Consertos e Ajustes
+                     Consertos e Ajustes
                 </h2>
                 <p style={{ color: '#625353', fontSize: '1rem', maxWidth: '580px', margin: '0 auto', lineHeight: '1.6' }}>
                     Precisa reformar uma peça especial, ajustar o tamanho ou fazer um reparo? Conte pra gente o que precisa e continuaremos o atendimento diretamente pelo WhatsApp!
